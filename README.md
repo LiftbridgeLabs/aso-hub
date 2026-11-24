@@ -17,6 +17,13 @@ edges outside that setup.
 The example `config.toml` uses made-up apps (Lumen, Kettle, Tandem, Atlas,
 Beacon); replace them with yours.
 
+![Overview page with sample data](docs/screenshot-overview.png)
+
+Screenshots show made-up numbers from `demo/seed.py`, which fills a throwaway
+database so you can look around without any keys:
+`python demo/seed.py /tmp/demo.db`, then
+`DATABASE_PATH=/tmp/demo.db python -m aso_hub serve`.
+
 ## Pages
 
 Every page takes a time range: 7 days, 30 days, 3 months or 12 months
