@@ -1,0 +1,20 @@
+[Unit]
+Description=ASO Hub: weekly crash digest to each app's #alerts
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+# Up to 5 tries over 2 hours.
+StartLimitIntervalSec=2h
+StartLimitBurst=5
+
+[Service]
+Type=oneshot
+User=ubuntu  # your server user
+Environment=TZ=America/New_York
+ExecStart=/usr/bin/docker exec aso-hub python -m aso_hub crash-digest
+# Retry when the digest couldn't run at all (the container restarting, say). Exit 3
+# means it ran and already reported the failure in #alerts, so a retry would only
+# repeat that alert. Apps already posted that week are skipped on a retry.
+Restart=on-failure
+RestartSec=10min
+RestartPreventExitStatus=3

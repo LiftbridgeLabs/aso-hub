@@ -1,0 +1,11 @@
+<li class="action {{ 'fyi' if a.kind == 'fyi' else '' }}">
+  <div class="row">
+    {% if a.kind == "do" %}<span class="badge {{ a.priority }}">{{ a.priority }}</span>{% endif %}
+    <strong>{{ a.title }}</strong>
+    <span class="meta">{{ a.app_label }} · since {{ a.first_seen | short_date }}
+      · {{ "AsoBeast" if a.source == "asobeast" else "hub rule" }}{% if a.snoozed %} · snoozed{% endif %}</span>
+  </div>
+  <p>{{ a.detail }}</p>
+  {% if a.source == "asobeast" %}<p><a href="{{ a.link }}" rel="noopener">Open AsoBeast to act on it, snooze or dismiss</a></p>
+  {% elif a.link %}<p><a href="{{ a.link }}" rel="noopener">{{ a.link_text or "Open" }}</a></p>{% endif %}
+</li>

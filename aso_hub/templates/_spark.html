@@ -1,0 +1,7 @@
+{% if sp %}
+<svg class="spark" viewBox="0 0 {{ sp.width }} {{ sp.height }}" role="img" aria-label="Downloads trend, {{ label }}">
+  <path class="area" d="{{ sp.area }}"/>
+  <polyline class="line" points="{{ sp.line }}"/>
+  <circle class="dot" cx="{{ '%.1f' | format(sp.last[0]) }}" cy="{{ '%.1f' | format(sp.last[1]) }}" r="3"/>
+</svg>
+{% endif %}

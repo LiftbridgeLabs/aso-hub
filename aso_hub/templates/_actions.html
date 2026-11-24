@@ -1,0 +1,24 @@
+{% set todo = actions | selectattr("kind", "equalto", "do") | list %}
+{% set fyi = actions | selectattr("kind", "equalto", "fyi") | list %}
+<div class="actions-split">
+  <section class="panel" id="actions">
+    <h2>To do{% if todo %} <span class="count">{{ todo | length }}</span>{% endif %}</h2>
+    {% if todo %}
+    <ul class="actions">
+      {% for a in todo %}{% include "_action.html" %}{% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">Nothing to do.</p>
+    {% endif %}
+  </section>
+  <section class="panel" id="fyi">
+    <h2>Worth knowing</h2>
+    {% if fyi %}
+    <ul class="actions">
+      {% for a in fyi %}{% include "_action.html" %}{% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">Nothing unusual.</p>
+    {% endif %}
+  </section>
+</div>

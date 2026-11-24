@@ -1,0 +1,11 @@
+[Unit]
+Description=ASO Hub: pull App Store Connect and AsoBeast numbers
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=ubuntu  # your server user
+Environment=TZ=America/New_York
+ExecStart=/usr/bin/docker exec aso-hub python -m aso_hub collect

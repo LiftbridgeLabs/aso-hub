@@ -1,0 +1,6 @@
+<nav class="periods" aria-label="Time range">
+  {% for value, name in periods.items() %}
+    {% if value == days %}<span aria-current="page">{{ name }}</span>
+    {% else %}<a href="?days={{ value }}">{{ name }}</a>{% endif %}
+  {% endfor %}
+</nav>

@@ -1,0 +1,27 @@
+{# Google Play crashes and ANRs, from the Play Developer Reporting API. #}
+{% if crashes is not none %}
+<section class="panel" id="crashes">
+<div class="panel-head"><h2>Crashes and ANRs</h2><small>last 30 days</small></div>
+<p class="note">From Google Play. An ANR means the app froze ("app not responding"). Google shows no daily crash
+  rate until an app has more users, so these are the issues themselves. Reports and users cover the last 30
+  days.</p>
+{% if crashes %}
+<div class="scroll">
+<table>
+  <thead><tr><th>Last seen</th><th>Kind</th><th>Where</th><th>Reports</th><th>Users</th><th>Version code</th><th></th></tr></thead>
+  <tbody>
+    {% for i in crashes %}
+    <tr><td>{{ i.lastErrorReportTime[:10] | short_date }}</td><td>{{ i.label }}</td>
+      <td class="where">{{ i.location or "" }}{% if i.cause %} <small>{{ i.cause }}</small>{% endif %}</td>
+      <td>{{ i.errorReportCount }}</td><td>{{ i.distinctUsers }}</td>
+      <td>{{ (i.lastAppVersion or {}).versionCode or "?" }}</td>
+      <td>{% if i.issueUri %}<a href="{{ i.issueUri }}" rel="noopener">Play Console</a>{% endif %}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="empty">No crashes or ANRs reported.</p>
+{% endif %}
+</section>
+{% endif %}

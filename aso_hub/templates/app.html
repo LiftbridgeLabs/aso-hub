@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% from "_icon.html" import icon %}
+{% block title %}{{ app.label }} · ASO Hub{% endblock %}
+{% block content %}
+{% set s = store %}
+{% set d = details.get(app.slug, {}) %}
+<div class="head">
+  <div class="title">
+    {{ icon(app, details, "l") }}
+    <div>
+      <h1>{{ app.label }}</h1>
+      <p>{{ "Google Play" if app.store == "google_play" else "App Store" }}
+        {%- if d.version %} · version {{ d.version }}{% endif %}
+        {%- if ratings and ratings.count %} · {{ "%.2f" | format(ratings.average) }}★ from {{ ratings.count }}
+        rating{{ '' if ratings.count == 1 else 's' }}{% endif %}</p>
+    </div>
+  </div>
+  {% if (s and not s.empty) or (play and not play.empty) %}{% include "_periods.html" %}{% endif %}
+</div>
+<nav class="jump" aria-label="On this page">
+  {% if (s and not s.empty) or (play and not play.empty) %}<a href="#numbers">Numbers</a>{% endif %}
+  {% if crashes is not none %}<a href="#crashes">Crashes</a>{% endif %}
+  <a href="#actions">Actions</a>
+  {% if ratings %}<a href="#reviews">Reviews</a>{% endif %}
+  {% for t in tables %}<a href="#keywords-{{ t.country }}">Keywords {{ t.country | upper }}</a>{% endfor %}
+</nav>
+
+{% if s is none %}
+  {% include "_play.html" %}
+  {% include "_crashes.html" %}
+{% elif s.empty %}
+  <p class="note">No App Store Connect data yet.</p>
+{% else %}
+  {% if s.analytics_since %}
+  <p class="note">Impressions, page views, deletions and proceeds start {{ s.analytics_since | short_date }}: Apple
+    keeps about a month of them, and the hub saves every day from its first pull on. Downloads go back a full year.</p>
+  {% endif %}
+
+  <div id="numbers">
+  {% set f = s.funnel %}
+  {% if f %}<p class="section-label">Funnel, {{ periods[days] }} to {{ f.end | short_date }}</p>{% endif %}
+  <div class="tiles">
+    {% if f %}
+    <div class="tile"><div class="label">Impressions</div><div class="value">{{ f.impressions | num }}</div>
+      <div class="sub">conversion {{ f.conversion | pct }}</div></div>
+    <div class="tile"><div class="label">Page views</div><div class="value">{{ f.page_views | num }}</div>
+      <div class="sub">{{ f.view_rate | pct }} of impressions</div></div>
+    {% endif %}
+    <div class="tile"><div class="label">Downloads, to {{ s.sales_day | short_date }}</div>
+      <div class="value">{{ s.downloads_period | num }}</div>
+      {% set change = s.downloads_change %}
+      <div class="sub"><span class="chip {{ 'up' if change > 0 else 'down' if change < 0 else '' }}">
+        {{ '▲ +' if change > 0 else '▼ −' if change < 0 else '' }}{{ change | abs | num }}</span> vs the {{ periods[days] }} before</div></div>
+    <div class="tile"><div class="label">Proceeds</div><div class="value">{{ s.proceeds_period | money }}</div>
+      <div class="sub">{{ s.proceeds_day | money }} on {{ s.analytics_day | short_date }}</div></div>
+    <div class="tile"><div class="label">Deletions, to {{ s.deletions_day | short_date }}</div>
+      <div class="value">{{ s.deletions_period | num }}</div>
+      <div class="sub">{% if s.downloads_deletions_period %}{{ (s.deletions_period / s.downloads_deletions_period) | pct }} of downloads{% else %}&nbsp;{% endif %}</div></div>
+  </div>
+  {% if f %}<p class="note">Conversion is first-time downloads ÷ impressions, as App Store Connect counts it. Page views
+    to downloads: {{ f.download_rate | pct }}.</p>{% endif %}
+  </div>
+
+  {% include "_charts.html" %}
+
+  <section class="panel">
+    <div class="panel-head"><h2>{{ "Daily" if days <= 30 else "Weekly" if days <= 90 else "Monthly" }}</h2></div>
+    <div class="scroll">
+    <table>
+      <thead><tr><th>{{ "Day" if days <= 30 else "Week" if days <= 90 else "Month" }}</th><th>Downloads</th><th>US</th>
+        <th>Impressions</th><th>Page views</th><th>Deletions</th><th>Proceeds</th></tr></thead>
+      <tbody>
+        {% for r in s.rows %}
+        <tr><td>{{ r.label }}</td><td>{{ r.downloads | num }}</td><td>{{ r.downloads_us | num }}</td>
+          <td>{{ r.impressions | num }}</td><td>{{ r.page_views | num }}</td><td>{{ r.deletions | num }}</td>
+          <td>{{ r.proceeds | money }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="note">A dash means Apple hasn't published those analytics yet (they run 1 to 2 days behind the sales
+      report), or they're from before the hub started saving them.</p>
+  </section>
+{% endif %}
+
+{% include "_actions.html" %}
+
+{% if ratings %}
+<section class="panel" id="reviews">
+  <div class="panel-head">
+    <h2>Ratings and reviews</h2>
+    {% if ratings.count %}
+    <span><span class="rating">{{ "%.2f" | format(ratings.average) }}</span><span class="stars"> ★</span>
+      <small>{{ ratings.count }} rating{{ '' if ratings.count == 1 else 's' }}, US store</small></span>
+    {% else %}
+    <small>{% if app.store == "google_play" %}Google Play isn't showing a star rating yet.{% else %}No ratings yet.{% endif %}</small>
+    {% endif %}
+  </div>
+  <div class="reviews">
+  {% for r in ratings.reviews %}
+  <blockquote class="review">
+    <p><span class="stars">{{ "★" * r.score }}{{ "☆" * (5 - r.score) }}</span> <strong>{{ r.title or "" }}</strong>
+      <small>{{ r.reviewedAt | short_date }} · version {{ r.version or "?" }}
+        · {{ "replied" if r.repliedAt else "no reply yet" }}</small></p>
+    {% if r.text %}<p>{{ r.text }}</p>{% endif %}
+  </blockquote>
+  {% else %}
+  <p class="empty">No reviews in the last 60 days.</p>
+  {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% for t in tables %}
+<section class="panel" id="keywords-{{ t.country }}">
+<div class="panel-head"><h2>Keywords, {{ t.country | upper }}</h2><small>AsoBeast, {{ t.fetched | short_date }}</small></div>
+<div class="scroll">
+<table class="keywords">
+  <thead><tr><th>Keyword</th><th>Position</th><th>Week</th><th>Popularity</th><th>Difficulty</th>
+    <th>Competitors ahead</th><th>In the listing</th></tr></thead>
+  <tbody>
+    {% for k in t.rows %}
+    <tr class="{{ 'auto' if k.hidden else '' }}">
+      <td>{{ k.text }}{% if k.hidden %} <small>auto</small>{% endif %}</td>
+      <td>{{ k.position }}</td>
+      <td>{% if k.week %}<span class="chip {{ 'up' if k.week > 0 else 'down' }}">{{ '▲' if k.week > 0 else '▼' }}{{ k.week | abs }}</span>{% elif k.week == 0 %}–{% endif %}</td>
+      <td>{{ "%.1f" | format(k.popularity) if k.popularity is not none else "–" }}</td>
+      <td>{{ "%.1f" | format(k.difficulty) if k.difficulty is not none else "–" }}</td>
+      <td>{% if k.ahead %}{{ k.ahead }} <small>best: {{ k.best_competitor }}</small>{% else %}none{% endif %}</td>
+      <td>{% if k.covered %}{{ k.covered | join(", ") }}
+        {% elif t.word_check and not k.missing_words %}all words, across fields
+        {% elif k.missing_words %}<span class="down">missing: {{ k.missing_words | join(", ") }}</span>
+        {% else %}<span class="down">not in the listing</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="note">Popularity and difficulty are on a 0 to 10 scale. "Week" is places moved in 7 days (▲ up). "In the
+  listing" names the field holding the whole phrase; otherwise it checks each word against the fields the store
+  searches{% if t.other_languages %}, including the {{ t.other_languages | join(", ") }} keyword field this store
+  also reads{% endif %}.
+  {% if t.hidden %}{{ t.hidden }} single word{{ '' if t.hidden == 1 else 's' }} AsoBeast added from the listing
+    {{ 'is' if t.hidden == 1 else 'are' }} hidden: <a href="?days={{ days }}&all=1#keywords-{{ t.country }}">show all</a>.
+  {% elif show_all %}<a href="?days={{ days }}#keywords-{{ t.country }}">Hide AsoBeast's single words</a>.{% endif %}
+</p>
+{% if t.fields %}
+<h3>Listing text, {{ t.country | upper }}</h3>
+<ul class="fields">
+  {% for f in t.fields %}
+  <li><strong>{{ f.name }}</strong>
+    {% if f.limit %}<small>{{ f.chars }} of {{ f.limit }} characters</small>{% endif %}
+    <div class="value">{{ f.value or "(empty)" }}</div>
+    {% for issue in f.issues %}<div class="down"><small>{{ issue.message if issue.message is defined else issue }}</small></div>{% endfor %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+</section>
+{% endfor %}
+{% if not tables %}
+<section class="panel"><h2>Keywords</h2><p class="empty">No keyword data from AsoBeast yet.</p></section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,44 @@
+{% from "_icon.html" import icon -%}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block title %}ASO Hub{% endblock %}</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('icon-32.png') }}">
+  <link rel="icon" type="image/png" sizes="64x64" href="{{ asset('icon-64.png') }}">
+  <link rel="apple-touch-icon" href="{{ asset('icon-180.png') }}">
+  <link rel="stylesheet" href="{{ asset('hub.css') }}">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="/"{% if path == "/" %} aria-current="page"{% endif %}><span class="mark" aria-hidden="true"></span>ASO Hub</a>
+      <nav aria-label="Apps">
+        {% for a in apps %}
+        <a href="/apps/{{ a.slug }}"{% if path == "/apps/" ~ a.slug %} aria-current="page"{% endif %}>{{ icon(a, details, "s") }}{{ a.label }}</a>
+        {% endfor %}
+        <a href="/actions"{% if path == "/actions" %} aria-current="page"{% endif %}>Actions{% if todo_count %} <span class="count" aria-label="{{ todo_count }} to do">{{ todo_count }}</span>{% endif %}</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    {% for s in sources if not s.ok %}
+    <p class="banner">
+      {% if s.never %}{{ s.name }} hasn't been read yet.
+      {% else %}The last {{ s.name }} pull failed: {{ s.message }}
+        {% if s.last_ok_at %}Showing data from {{ s.last_ok_at | short_date }}.{% endif %}
+      {% endif %}
+    </p>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="fresh">
+    {% for s in sources %}
+    <span class="{{ 'ok' if s.ok else 'bad' }}">{{ s.name }}:
+      {% if s.last_ok_at %}updated {{ s.last_ok_at | short_date }}{% else %}not read yet{% endif %}</span>
+    {% endfor %}
+  </footer>
+</body>
+</html>

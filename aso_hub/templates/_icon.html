@@ -1,0 +1,5 @@
+{# An app's store icon, or its first letter when AsoBeast hasn't sent one. #}
+{% macro icon(app, details, size="m") -%}
+{%- set d = details.get(app.slug, {}) -%}
+<span class="icon {{ size }}" aria-hidden="true">{% if d.icon %}<img src="{{ d.icon }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% else %}{{ app.name[:1] }}{% endif %}</span>
+{%- endmacro %}

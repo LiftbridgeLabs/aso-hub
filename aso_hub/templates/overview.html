@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% from "_icon.html" import icon %}
+{% block content %}
+<div class="head">
+  <h1>Overview</h1>
+  {% include "_periods.html" %}
+</div>
+<div class="cards">
+  {% for c in cards %}
+  <section class="card">
+    <div class="card-head">
+      {{ icon(c.app, details, "m") }}
+      <div>
+        <h2><a href="/apps/{{ c.app.slug }}?days={{ days }}">{{ c.app.label }}</a></h2>
+        <p>{{ "Google Play" if c.app.store == "google_play" else "App Store" }}
+          {%- if c.ratings and c.ratings.count %} · {{ "%.2f" | format(c.ratings.average) }}★ from {{ c.ratings.count }}
+          rating{{ '' if c.ratings.count == 1 else 's' }}{% endif %}</p>
+      </div>
+    </div>
+
+    {% set s = c.store %}
+    {% if s is none %}
+      {% set g = c.play %}
+      {% if g and not g.empty %}
+      <div class="hero">
+        <div>
+          <div class="label">Installs, {{ periods[days] }} to {{ g.end | short_date }}</div>
+          <div class="value">{{ g.installs_period | num }}</div>
+        </div>
+        {% with sp = c.spark, label = periods[days] %}{% include "_spark.html" %}{% endwith %}
+      </div>
+      {% set change = g.installs_change %}
+      <div class="sub"><span class="chip {{ 'up' if change > 0 else 'down' if change < 0 else '' }}">
+        {{ '▲ +' if change > 0 else '▼ −' if change < 0 else '' }}{{ change | abs | num }}</span>
+        <small>vs the {{ periods[days] }} before</small></div>
+      <div class="minis">
+        <div><div class="label">Store visitors{% if g.store_end %} to {{ g.store_end | short_date }}{% endif %}</div>
+          <div class="value">{{ g.visitors_period | num }}</div>
+          {% if g.conversion is not none %}<small>{{ g.conversion | pct }} installed</small>{% endif %}</div>
+        <div><div class="label">In-app purchases</div>
+          <div class="value">{{ g.purchases_period | num }}</div>
+          <small>{{ (c.crashes or []) | length }} crash{{ '' if (c.crashes or []) | length == 1 else 'es' }} in 30 days</small></div>
+      </div>
+      {% else %}
+      <p class="note">No Google Play report files read yet.</p>
+      {% endif %}
+    {% elif s.empty %}
+      <p class="note">No App Store Connect data yet.</p>
+    {% else %}
+      <div class="hero">
+        <div>
+          <div class="label">Downloads, {{ periods[days] }}</div>
+          <div class="value">{{ s.downloads_period | num }}</div>
+        </div>
+        {% with sp = c.spark, label = periods[days] %}{% include "_spark.html" %}{% endwith %}
+      </div>
+      {% set change = s.downloads_change %}
+      <div class="sub"><span class="chip {{ 'up' if change > 0 else 'down' if change < 0 else '' }}">
+        {{ '▲ +' if change > 0 else '▼ −' if change < 0 else '' }}{{ change | abs | num }}</span>
+        <small>vs the {{ periods[days] }} before</small></div>
+      <div class="minis">
+        <div><div class="label">Downloads {{ s.sales_day | short_date }}</div>
+          <div class="value">{{ s.downloads_day | num }} <small>{{ s.downloads_us_day | num }} US</small></div></div>
+        <div><div class="label">Proceeds, {{ periods[days] }}</div>
+          <div class="value">{{ s.proceeds_period | money }}</div>
+          <small>{{ s.proceeds_day | money }} on {{ s.analytics_day | short_date }}</small></div>
+      </div>
+    {% endif %}
+
+    {% if c.moves %}
+    <div>
+      <p class="section-label">Keyword moves, {{ c.market | upper }}, 7 days</p>
+      <ul class="moves">
+        {% for m in c.moves %}
+        <li><span class="{{ 'up' if m.change > 0 else 'down' }}">{{ '▲' if m.change > 0 else '▼' }}</span>
+          <span class="kw">{{ m.text }}</span> <small>{{ m.before | pos }} → {{ m.after | pos }}</small></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <div class="card-foot">
+      <a class="chip {{ 'todo' if c.todo else '' }}" href="/apps/{{ c.app.slug }}#actions">{{ c.todo }} to do</a>
+      <a class="chip" href="/apps/{{ c.app.slug }}#fyi">{{ c.fyi }} worth knowing</a>
+    </div>
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

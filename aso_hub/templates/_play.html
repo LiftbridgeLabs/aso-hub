@@ -1,0 +1,65 @@
+{# Google Play numbers for one app, from Play Console's report files. #}
+{% set g = play %}
+{% if g.empty %}
+  <p class="note">No Google Play report files read yet.</p>
+{% else %}
+<div id="numbers">
+  <p class="section-label">{{ periods[days] }} to {{ g.end | short_date }}</p>
+  <div class="tiles">
+    <div class="tile"><div class="label">Store listing visitors{% if g.store_end %}, to {{ g.store_end | short_date }}{% endif %}</div>
+      <div class="value">{{ g.visitors_period | num }}</div>
+      <div class="sub">{% if g.conversion is not none %}{{ g.acquisitions_period | num }} installed · {{ g.conversion | pct }}{% else %}&nbsp;{% endif %}</div></div>
+    <div class="tile"><div class="label">Installs (new users)</div><div class="value">{{ g.installs_period | num }}</div>
+      {% set change = g.installs_change %}
+      <div class="sub"><span class="chip {{ 'up' if change > 0 else 'down' if change < 0 else '' }}">
+        {{ '▲ +' if change > 0 else '▼ −' if change < 0 else '' }}{{ change | abs | num }}</span> {{ g.installs_us_period | num }} US</div></div>
+    <div class="tile"><div class="label">Uninstalls</div><div class="value">{{ g.uninstalls_period | num }}</div>
+      <div class="sub">{% if g.installs_period %}{{ (g.uninstalls_period / g.installs_period) | pct }} of installs{% else %}&nbsp;{% endif %}</div></div>
+    <div class="tile"><div class="label">Devices with {{ app.name }}</div><div class="value">{{ g.active_devices | num }}</div>
+      <div class="sub">on {{ g.end | short_date }}</div></div>
+    <div class="tile"><div class="label">In-app purchases{% if g.sales_end %}, to {{ g.sales_end | short_date }}{% endif %}</div>
+      <div class="value">{{ g.purchases_period | num }}</div>
+      <div class="sub">{% if g.earnings %}{{ g.earnings[0].net | money }} earned in {{ g.earnings[0].date[:7] | month }}{% else %}&nbsp;{% endif %}</div></div>
+  </div>
+  <p class="note">Google Play reports run a few days behind: installs to {{ g.end | short_date }}{% if g.store_end %}, store
+    visitors to {{ g.store_end | short_date }}{% endif %}. "Installed" is visitors who installed from the store listing;
+    installs and uninstalls count people, not devices.</p>
+</div>
+
+{% include "_charts.html" %}
+
+<section class="panel">
+  <div class="panel-head"><h2>{{ "Daily" if days <= 30 else "Weekly" if days <= 90 else "Monthly" }}</h2></div>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>{{ "Day" if days <= 30 else "Week" if days <= 90 else "Month" }}</th><th>Visitors</th><th>Installed</th>
+      <th>Installs</th><th>US</th><th>Uninstalls</th><th>Purchases</th></tr></thead>
+    <tbody>
+      {% for r in g.rows %}
+      <tr><td>{{ r.label }}</td><td>{{ r.visitors | num }}</td><td>{{ r.acquisitions | num }}</td>
+        <td>{{ r.installs | num }}</td><td>{{ r.installs_us | num }}</td><td>{{ r.uninstalls | num }}</td>
+        <td>{{ r.purchases | num }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="note">A dash means Google hasn't reported store visitors for those days yet.</p>
+</section>
+
+{% if g.earnings %}
+<section class="panel">
+  <div class="panel-head"><h2>Earnings</h2><small>Google Play, after Google's fee</small></div>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Month</th><th>Sales</th><th>Earned</th></tr></thead>
+    <tbody>
+      {% for e in g.earnings %}
+      <tr><td>{{ e.date[:7] | month }}</td><td>{{ e.gross | money }}</td><td>{{ e.net | money }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="note">Google publishes each month's earnings early the next month, in US dollars.</p>
+</section>
+{% endif %}
+{% endif %}

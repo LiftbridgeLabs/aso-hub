@@ -1,0 +1,24 @@
+[project]
+name = "aso-hub"
+version = "0.1.0"
+requires-python = ">=3.13"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# CI runs plain `pytest`, which doesn't put the repo root on the import path.
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
+ignore = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["aso_hub", "conftest"]
+
+[tool.ruff.lint.per-file-ignores]
+# assert is how pytest checks things
+"tests/*" = ["S101"]

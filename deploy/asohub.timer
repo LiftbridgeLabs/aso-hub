@@ -1,0 +1,9 @@
+[Unit]
+Description=Schedule for asohub (7:00 AM and 1:00 PM Eastern)
+
+[Timer]
+OnCalendar=*-*-* 07,13:00:00 America/New_York
+Persistent=true
+
+[Install]
+WantedBy=timers.target

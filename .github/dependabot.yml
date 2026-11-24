@@ -1,0 +1,19 @@
+# Keeps the workflows' pinned actions, the Docker base image and the Python packages current, a pull request a week
+# at most each. Python updates are grouped so a week's bumps arrive (and get tested) together.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        patterns: ["*"]

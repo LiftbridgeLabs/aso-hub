@@ -1,0 +1,118 @@
+# ASO Hub settings. The apps, markets and rule thresholds.
+# Change a number, then restart the hub (the next pull uses it). No secrets here:
+# keys and tokens live on the server.
+
+# One entry per store listing. apple_id is the number in the App Store link;
+# google_package is the Play Store id. markets are two-letter store codes.
+[[apps]]
+slug = "lumen-ios"
+name = "Lumen"
+store = "app_store"
+apple_id = "1000000001"
+markets = ["us", "gb", "de"]
+
+[[apps]]
+slug = "lumen-android"
+name = "Lumen"
+store = "google_play"
+google_package = "com.example.lumen"
+markets = ["us"]
+
+[[apps]]
+slug = "kettle-ios"
+name = "Kettle"
+store = "app_store"
+apple_id = "1000000002"
+markets = ["us"]
+
+[[apps]]
+slug = "tandem-ios"
+name = "Tandem"
+store = "app_store"
+apple_id = "1000000003"
+markets = ["us", "de"]   # a second market for this app
+
+[[apps]]
+slug = "atlas-ios"
+name = "Atlas"
+store = "app_store"
+apple_id = "1000000004"
+markets = ["us"]          # AsoBeast tracks US keywords only so far
+
+[[apps]]
+slug = "beacon-android"
+name = "Beacon"
+store = "google_play"
+google_package = "com.example.beacon"
+markets = ["us"]   # Example: iOS is TestFlight only, which Apple's
+                   # reports don't cover; add it at its App Store launch.
+
+# Keywords to hide in the keyword tables. AsoBeast re-adds single words from
+# titles, subtitles and keyword fields on every daily check; hiding them here
+# is safer than deleting them there. Single words are hidden unless listed
+# under keep_single_words. "Show all" on the page still shows them.
+[keywords]
+hide_single_words = true
+# The server names Lumen's users search for.
+keep_single_words = ["audiobookshelf", "bookorbit", "grimmory", "atlas"]
+
+# Rules the hub checks on the store numbers. Each one adds an item to the
+# Actions list while it is true. Set enabled = false to turn a rule off.
+
+# Average US first-time downloads per day over `days` drops below
+# `min_per_day`. Per app, because a new app's normal is lower.
+[rules.low_downloads]
+enabled = true
+days = 7
+min_per_day = { "lumen-ios" = 3.0 }   # Lumen's normal is about 3.4 a day
+
+# Deletions are more than `max_rate` of first-time downloads over `days`.
+# Needs at least `min_downloads` downloads so one deletion out of one
+# download doesn't read as 100%.
+[rules.deletion_rate]
+enabled = true
+days = 14
+max_rate = 0.50
+min_downloads = 10
+
+# Product page views on the latest day are at least `factor` times the
+# daily average of the `baseline_days` before it (and at least `min_views`),
+# while first-time downloads stay under `downloads_factor` times their
+# average. Usually a shared link that isn't converting.
+[rules.page_view_spike]
+enabled = true
+baseline_days = 28
+factor = 3.0
+min_views = 20
+downloads_factor = 1.5
+
+# A tracked keyword sits `places` or more below its usual spot of the week
+# before on each of the last `days` checks. Only keywords usually in the top
+# `from_top` count: a fall from #120 to #200 changes nothing, since almost
+# nobody scrolls that far.
+[rules.keyword_drop]
+enabled = true
+places = 15
+days = 3
+from_top = 50
+
+# A new rating or review arrives.
+[rules.new_review]
+enabled = true
+
+# A Google Play crash or ANR (the app froze) happened in the last `days`
+# days. High when it hit at least `many_users` people.
+[rules.play_crash]
+enabled = true
+days = 7
+many_users = 3
+
+# The weekly crash digest (Mondays, 8:00 AM server time): one message per app to
+# that app's own #alerts channel, with the last week's crashes and freezes
+# against the week before. Each listed app needs its #alerts webhook saved on
+# the server as alerts-<app> (alerts-lumen, alerts-tandem); a listed app
+# without one is reported as a failure in the Admin-Stuff #alerts. iOS and
+# Android of the same app share one message.
+[crash_digest]
+apps = ["Lumen", "Tandem", "Kettle", "Atlas", "Beacon"]
+top_issues = 3   # Android issues listed per week, most reports first

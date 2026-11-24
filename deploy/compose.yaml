@@ -1,0 +1,44 @@
+# Example compose file for any Docker host. Data in /opt/appdata/aso-hub/data,
+# secrets (Apple and Google keys, AsoBeast token, Discord webhooks) in /opt/appdata/aso-hub/secrets, both owned by uid 1001.
+# No ports are published: put a reverse proxy or tunnel on `proxy_network` that reaches http://aso-hub:8690
+# (or add `ports: ["8690:8690"]` to reach it directly on a trusted network).
+services:
+  aso-hub:
+    image: aso-hub:${ASO_HUB_VERSION:?set ASO_HUB_VERSION in .env}
+    container_name: aso-hub
+    restart: unless-stopped
+    # .env holds the non-secret ids (ASC_ISSUER_ID, ASC_KEY_ID, ASC_VENDOR_NUMBER, CF_ACCESS_AUD).
+    env_file: .env
+    environment:
+      ASC_KEY_PATH: /secrets/asc-key.p8
+      ASOBEAST_TOKEN_FILE: /secrets/asobeast-token
+      ASOBEAST_URL: http://asobeast-api:4000
+      # The aso-hub webhook in #marketing-visibility: new to-dos post there.
+      DISCORD_WEBHOOK_FILE: /secrets/discord-webhook
+      # The weekly crash digest's webhooks: alerts-<app> (each app's own #alerts) and
+      # alerts-admin (the Admin-Stuff #alerts, where a failed digest is reported).
+      ALERTS_WEBHOOK_DIR: /secrets
+      # The aso-hub service account (a Google Cloud service account), read-only in Play Console.
+      GOOGLE_KEY_PATH: /secrets/google-play.json
+      # Play Console's reports bucket (installs, store visitors, sales, earnings). Not a secret.
+      PLAY_BUCKET: pubsite_prod_YOUR_BUCKET_ID
+    volumes:
+      - /opt/appdata/aso-hub/data:/data
+      - /opt/appdata/aso-hub/secrets:/secrets:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - proxy_network
+      # AsoBeast's API network, so the hub reads it inside the server instead of over the public internet.
+      - asobeast
+
+networks:
+  proxy_network:
+    external: true
+  asobeast:
+    external: true
+    name: ${ASOBEAST_NETWORK:?set ASOBEAST_NETWORK in .env}
