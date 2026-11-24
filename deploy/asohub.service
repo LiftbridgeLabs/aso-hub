@@ -6,6 +6,7 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-User=ubuntu  # your server user
+# Your server user:
+User=ubuntu
 Environment=TZ=America/New_York
 ExecStart=/usr/bin/docker exec aso-hub python -m aso_hub collect

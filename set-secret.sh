@@ -18,5 +18,8 @@ if [[ "$name" == alerts-* || "$name" == discord-webhook ]] && [[ "$value" != htt
   echo "that isn't a Discord webhook address (it starts https://discord.com/api/webhooks/); nothing saved" >&2; exit 1
 fi
 umask 077
-printf '%s\n' "$value" > "$dir/$name"
+tmp=$(mktemp "$dir/.$name.XXXXXX")
+trap 'rm -f "$tmp"' EXIT
+printf '%s\n' "$value" > "$tmp"
+mv "$tmp" "$dir/$name"
 echo "Saved to $dir/$name (only you can read it)."

@@ -216,7 +216,8 @@ and the crash digest weekly through `docker exec`; copy them to
 `/etc/systemd/system/`, set the times and your user, and enable the timers.
 
 Build the image on the host or anywhere that matches its CPU, then point
-`ASO_HUB_VERSION` in `.env` at the tag and run `docker compose up -d`:
+`ASO_HUB_VERSION` in `.env` (next to `deploy/compose.yaml`) at the tag and run
+`docker compose -f deploy/compose.yaml up -d`:
 
 ```sh
 tag=$(git rev-parse --short HEAD)

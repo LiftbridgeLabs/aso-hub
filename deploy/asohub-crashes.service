@@ -9,7 +9,8 @@ StartLimitBurst=5
 
 [Service]
 Type=oneshot
-User=ubuntu  # your server user
+# Your server user:
+User=ubuntu
 Environment=TZ=America/New_York
 ExecStart=/usr/bin/docker exec aso-hub python -m aso_hub crash-digest
 # Retry when the digest couldn't run at all (the container restarting, say). Exit 3
