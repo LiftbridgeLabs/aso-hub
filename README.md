@@ -290,8 +290,9 @@ The pull and the weekly crash digest run on a schedule you set on the host.
 are systemd units that do it through `docker exec`; copy them to
 `/etc/systemd/system/`, set the times and your user, and enable the timers.
 
-To update, run `docker compose pull && docker compose up -d`. To stay on one
-release, set `ASO_HUB_VERSION` in `.env` to its number. The version you are on
+To update, run `docker compose pull && docker compose up -d`. If
+`ASO_HUB_VERSION` in `.env` is a number, that command stays on it: change it to
+the new release's number first, or to `latest`. The version you are on
 shows at the bottom of every page.
 
 ## Checks
