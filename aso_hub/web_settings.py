@@ -15,9 +15,9 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from starlette.concurrency import run_in_threadpool
 
-from . import asc, asobeast, db, discover, forms, notify, overlay, play, scheduler, status
+from . import asc, asobeast, collect, db, discover, forms, notify, overlay, play, scheduler, status
 from .settings import App, Settings
-from .ui import conn_and_config, page, saved
+from .ui import SOURCE_NAMES, conn_and_config, page, saved
 
 router = APIRouter()
 SLUG = re.compile(r"[^a-z0-9]+")
@@ -283,6 +283,10 @@ def _alerts_page(request: Request, cfg, conn, **context):
 
 # Schedule
 
+JOBS = {"pull": "data pull", "digest": "crash digest"}
+WHEN = "%b %-d at %-I:%M %p"
+
+
 def _change_schedule(cfg: Settings, conn: sqlite3.Connection, form: forms.Form) -> str:
     zone = form.text("timezone")
     if zone not in zoneinfo.available_timezones():
@@ -307,19 +311,45 @@ def _change_schedule(cfg: Settings, conn: sqlite3.Connection, form: forms.Form) 
     return "Schedule saved."
 
 
+def _last_run(runs: dict, sources: tuple[str, ...], tz: dt.tzinfo) -> dict | None:
+    """How a job went the last time, across the sources it reads."""
+    done = {s: runs[s]["last"] for s in sources if runs.get(s, {}).get("last")}
+    if not done:
+        return None
+    finished = dt.datetime.fromisoformat(max(r["finished_at"] for r in done.values()))
+    failed = {s: r for s, r in done.items() if not r["ok"]}
+    if len(sources) == 1:
+        note = done[sources[0]]["message"]
+    else:
+        note = "; ".join(f"{SOURCE_NAMES.get(s, 'Discord')}: {r['message']}" for s, r in failed.items())
+    return {"when": finished.astimezone(tz).strftime(WHEN), "ok": not failed, "note": note}
+
+
 def _schedule_page(request: Request, cfg, conn, **context):
     plan = scheduler.schedule(conn)
     tz = scheduler.zone(plan["timezone"])
     now = dt.datetime.now(dt.UTC)
     upcoming = {job: scheduler.slots(plan, job, now)[1] for job in ("pull", "digest")}
-    fmt = "%a, %b %-d at %-I:%M %p"
+    runs = db.last_runs(conn)
+    if not plan["enabled"]:
+        upcoming = {}
+    jobs = [{"name": name,
+             "next": upcoming[job].astimezone(tz).strftime("%a, " + WHEN) if upcoming.get(job) else None,
+             "last": _last_run(runs, sources, tz)}
+            for job, name, sources in (("pull", "Data pull", (*collect.SOURCES, "discord")),
+                                       ("digest", "Crash digest", ("crash_digest",)))]
     return page(request, "settings/schedule.html", cfg, conn, plan=plan, days=scheduler.DAYS,
-                zones=sorted(zoneinfo.available_timezones()), running=scheduler.RUNNING.locked(),
-                upcoming={k: v.astimezone(tz).strftime(fmt) for k, v in upcoming.items() if v},
-                runs=db.last_runs(conn), **context)
+                zones=sorted(zoneinfo.available_timezones()), running=JOBS.get(scheduler.current), jobs=jobs,
+                **context)
 
 
 PAGES = {"connections": _connections_page, "apps": _apps_page, "alerts": _alerts_page, "schedule": _schedule_page}
+
+
+@router.get("/settings/schedule/status")
+def job_status():
+    """What is running now; the Schedule page asks until it's done."""
+    return {"running": scheduler.current}
 
 
 @router.get("/settings/{section}", response_class=HTMLResponse)
@@ -346,9 +376,11 @@ def _apply(request: Request, cfg, conn, section: str, action: str, form: forms.F
     if section == "schedule" and action == "save":
         return saved(back, _change_schedule(cfg, conn, form))
     if section == "schedule" and action in ("pull", "digest"):
+        if action == "digest" and not cfg.crash_digest.get("apps"):
+            raise Refused("Choose apps for the crash digest under Alerts first.")
         if not scheduler.run_now(action):
-            raise Refused("A pull or digest is already running. Try again in a minute.")
-        return saved(back, "Started. Reload in a minute to see the result.")
+            raise Refused("A pull or digest is already running. Wait for it to finish.")
+        return saved(back, f"Started the {JOBS[action]}.")
     raise Refused("Unknown change.")
 
 

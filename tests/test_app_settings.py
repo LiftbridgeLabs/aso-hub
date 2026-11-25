@@ -192,6 +192,35 @@ def test_one_job_runs_at_a_time(cfg, hub):
     assert r.status_code == 400 and "already running" in r.text
 
 
+def test_the_schedule_page_says_what_is_running(cfg, hub, monkeypatch):
+    assert hub.get("/settings/schedule/status").json() == {"running": None}
+    assert "data-running" not in hub.get("/settings/schedule").text
+    monkeypatch.setattr(scheduler, "current", "pull")
+    assert hub.get("/settings/schedule/status").json() == {"running": "pull"}
+    body = hub.get("/settings/schedule").text
+    assert "The data pull is running." in body and body.count('class="quiet" disabled') == 2
+
+
+def test_a_job_is_named_only_while_it_runs(cfg, monkeypatch):
+    seen = []
+    monkeypatch.setattr(scheduler, "_run", lambda job: seen.append(scheduler.current))
+    scheduler.run_job("digest")
+    assert seen == ["digest"] and scheduler.current is None
+
+
+def test_a_pull_that_partly_failed_says_which_part(cfg, hub, conn):
+    for source, ok, message in (("asobeast", True, "read"), ("asc", False, "Apple said no"), ("discord", True, "")):
+        db.finish_run(conn, db.start_run(conn, source), ok, message)
+    body = hub.get("/settings/schedule").text
+    assert "failed" in body and "App Store Connect: Apple said no" in body
+
+
+def test_the_digest_needs_apps(cfg, hub, conn):
+    db.set_setting(conn, "crash_digest", {"apps": []})
+    r = hub.post("/settings/schedule/digest")
+    assert r.status_code == 400 and "Choose apps" in r.text
+
+
 def test_turned_off_nothing_is_due(cfg, conn):
     db.set_setting(conn, "schedule", {"enabled": False})
     assert taken(conn, at("2026-11-30 09:00")) == []

@@ -16,6 +16,7 @@ DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sun
 TIME = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
 TICK_SECONDS = 30
 RUNNING = threading.Lock()  # one pull or digest at a time
+current: str | None = None  # the job running now, for the Schedule page
 
 
 def schedule(conn: sqlite3.Connection) -> dict:
@@ -73,6 +74,15 @@ def due(conn: sqlite3.Connection, now: dt.datetime) -> Iterator[str]:
 
 def run_job(job: str) -> None:
     """Run one job now. The caller holds RUNNING."""
+    global current
+    current = job
+    try:
+        _run(job)
+    finally:
+        current = None
+
+
+def _run(job: str) -> None:
     base = settings.load()
     conn = db.connect(base.database_path)
     try:
@@ -88,8 +98,11 @@ def run_job(job: str) -> None:
 
 def run_now(job: str) -> bool:
     """Start a job in the background; False when one is already running."""
-    if not RUNNING.acquire(blocking=False):
+    global current
+    # The clock holds the lock for a moment each time it checks what is due, so wait briefly.
+    if current or not RUNNING.acquire(timeout=2):
         return False
+    current = job  # said at once, before the thread gets going
 
     def work() -> None:
         try:

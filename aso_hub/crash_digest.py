@@ -193,13 +193,14 @@ def run(settings: Settings, conn: sqlite3.Connection, today: dt.date | None = No
     failures = [f"{n} is picked for the crash digest but isn't one of the apps." for n in wanted
                 if n not in known]
     run_id = db.start_run(conn, "crash_digest")
-    posted = []
+    posted, earlier = [], []
     with httpx.Client(transport=transport, timeout=20, headers={"User-Agent": "aso-hub"}) as http:
         for name in (n for n in wanted if n in known):
             sent = conn.execute("SELECT 1 FROM crash_digests WHERE app = ? AND week_start = ?",
                                 (name, week.start.isoformat())).fetchone()
             if sent and not again and not dry_run:
                 print(f"{name}: the digest for {week.label} was already posted")
+                earlier.append(name)
                 continue
             try:
                 url = None if dry_run else _webhook(settings, name)
@@ -231,6 +232,8 @@ def run(settings: Settings, conn: sqlite3.Connection, today: dt.date | None = No
                 failures.append(f"{name}: unexpected error ({type(e).__name__})")
                 traceback.print_exc()
         summary = f"posted {', '.join(posted) or 'nothing'} for {week.label}"
+        if earlier:
+            summary += f"; already posted before: {', '.join(earlier)}"
         if failures:
             _alert_failure(settings, http, week, failures, posted, dry_run)
     db.finish_run(conn, run_id, not failures, summary + (f"; {len(failures)} problem(s)" if failures else ""))

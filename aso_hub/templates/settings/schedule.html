@@ -16,17 +16,19 @@
   <h2>Next and last runs</h2>
   <div class="scroll">
   <table class="settings">
-    {% for job, name, source in [("pull", "Data pull", "asc"), ("digest", "Crash digest", "crash_digest")] %}
-    <tr><td>{{ name }}</td>
-      <td>{% if plan.enabled and upcoming.get(job) %}Next: {{ upcoming[job] }}{% else %}Not scheduled{% endif %}</td>
-      <td>{% set last = runs.get(source, {}).get("last") %}{% if last %}Last: {{ last.finished_at | short_date }}, {{ "ok" if last.ok else "failed" }}{% else %}Never run{% endif %}</td></tr>
+    {% for job in jobs %}
+    <tr><td>{{ job.name }}</td>
+      <td>{% if job.next %}Next: {{ job.next }}{% else %}Not scheduled{% endif %}</td>
+      <td>{% if job.last %}Last: {{ job.last.when }}, {{ "ok" if job.last.ok else "failed" }}
+        {% if job.last.note %}<br><small class="muted">{{ job.last.note }}</small>{% endif %}{% else %}Never run{% endif %}</td></tr>
     {% endfor %}
   </table>
   </div>
-  {% if running %}<p>Something is running now. Reload to see when it finishes.</p>{% endif %}
+  {% if running %}<p role="status" data-running><strong>The {{ running }} is running.</strong> This page updates by itself when it finishes.</p>{% endif %}
   <div class="row">
-    <form method="post" action="/settings/schedule/pull"><button class="quiet">Pull now</button></form>
-    <form method="post" action="/settings/schedule/digest"><button class="quiet">Send the crash digest now</button></form>
+    <form method="post" action="/settings/schedule/pull"><button class="quiet"{% if running %} disabled{% endif %}>Pull now</button></form>
+    <form method="post" action="/settings/schedule/digest"><button class="quiet"{% if running %} disabled{% endif %}>Send the crash digest now</button></form>
   </div>
+  <p class="muted"><small>The crash digest posts once for each week. Sending it again for the same week posts nothing new.</small></p>
 </section>
 {% endblock %}
