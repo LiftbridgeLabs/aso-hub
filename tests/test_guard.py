@@ -40,4 +40,4 @@ def test_strangers_text_cant_pose_as_a_discord_link():
             return type("R", (), {"status_code": 200})()
 
     notify._post(Client(), "https://discord.com/api/webhooks/1/x", "Click [your bank](https://evil.example)")
-    assert sent == ["Click [your bank] (https://evil.example)"]
+    assert sent == ["Click [your bank]\uff08https://evil.example)"]

@@ -94,7 +94,8 @@ def send(conn: sqlite3.Connection, settings: Settings, transport: httpx.BaseTran
 
 def _post(client: httpx.Client, url: str, text: str) -> None:
     # Review and crash text comes from strangers: break "[words](address)" so it can't pose as a link.
-    text = text.replace("](", "] (")
+    # A look-alike bracket keeps the length, so messages already measured still fit.
+    text = text.replace("](", "]\uff08")
     payload = {"content": text, "allowed_mentions": {"parse": []}, "flags": 4}  # 4: no link previews
     try:
         # wait=true: Discord answers only after the message is saved.

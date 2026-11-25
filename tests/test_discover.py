@@ -11,9 +11,11 @@ from conftest import ROOT
 TODAY = dt.date(2026, 10, 28)
 
 
-def beast(apps: dict[str, dict], countries: list[str] = ("de", "us")):
+def beast(apps: dict[str, dict], countries: list[str] = ("de", "us"), asked: list | None = None):
     def answer(request: httpx.Request) -> httpx.Response:
         path = request.url.path
+        if asked is not None:
+            asked.append(path)
         if path == "/apps":
             return httpx.Response(200, json=[{"id": i} for i in apps])
         if path.count("/") == 2 and path.startswith("/apps/"):
@@ -55,7 +57,9 @@ def test_config_wins_and_ignored_apps_stay_out(conn, cfg):
     apps = {"a": listing("Another title", lumen.apple_id), "b": listing("Skip me", "222222222"),
             "c": listing("Gone", "333333333", delistedAt="2026-10-01"),
             "d": listing("Bad id", "../v1/users"), "e": listing("New", "444444444")}
-    asobeast.pull(conn, mine, beast(apps), TODAY)
+    asked = []
+    asobeast.pull(conn, mine, beast(apps, asked=asked), TODAY)
+    assert not {"/apps/b/keyword-countries", "/apps/c/keyword-countries"} & set(asked)
     assert [a.slug for a in discover.with_apps(mine, conn).apps] == ["lumen-ios", "new-ios"]
 
 

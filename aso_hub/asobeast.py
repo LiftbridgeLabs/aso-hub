@@ -75,7 +75,9 @@ def pull(conn: sqlite3.Connection, settings: Settings, client: Client | None = N
     if settings.add_apps:
         listed = {(STORES[a.store], a.store_id) for a in configured}
         for aid, d in details.items():
-            if (d["store"], d.get("storeAppId")) not in listed:
+            # Apps that won't be added aren't asked about, so they can't fail the pull.
+            if ((d["store"], d.get("storeAppId")) not in listed and not d.get("delistedAt")
+                    and d.get("storeAppId") not in settings.ignore_apps):
                 details[aid] = d | {"markets": markets(client, aid, d.get("country"))}
         previous, _ = db.latest_snapshot(conn, "discovered", "all")
         discovered = discover.describe(list(details.values()), settings, (previous or {}).get("apps", []))
