@@ -11,7 +11,7 @@ if [[ -n "${ASO_HUB_SECRETS:-}" ]]; then dir="$ASO_HUB_SECRETS"
 elif [[ -d "$server_dir" ]]; then dir="$server_dir"
 else dir="$HOME/.config/aso-hub"; fi
 mkdir -p "$dir" && chmod 700 "$dir"
-IFS= read -r -s -p "Paste $name: " value
+read -r -s -p "Paste $name: " value
 echo
 [[ -n "$value" ]] || { echo "nothing pasted, nothing saved" >&2; exit 1; }
 if [[ "$name" == alerts-* || "$name" == discord-webhook ]] && [[ "$value" != https://discord.com/api/webhooks/* ]]; then
