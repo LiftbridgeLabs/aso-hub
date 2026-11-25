@@ -211,7 +211,8 @@ signed pass (`access.py`).
 
 The image is published to Docker Hub for Intel/AMD and ARM machines. Put these
 in one folder: [`deploy/compose.yaml`](deploy/compose.yaml),
-[`config.toml`](config.toml) (edit it for your apps), and
+[`config.toml`](config.toml) (edit it for your apps),
+[`set-secret.sh`](set-secret.sh) (saves a secret without showing it), and
 [`deploy/.env.example`](deploy/.env.example) saved as `.env`. Then:
 
 ```sh
@@ -221,7 +222,8 @@ docker compose up -d      # after adding secret files: sudo chown -R 1001:1001 s
 
 Open http://127.0.0.1:8690. Save secrets as files in `secrets/` (readable by user
 1001), for example
-`ASO_HUB_SECRETS=./secrets ./set-secret.sh asobeast-token`.
+`ASO_HUB_SECRETS=./secrets bash set-secret.sh asobeast-token`
+(with `sudo` once `secrets/` belongs to user 1001, then run the `chown` again).
 
 If AsoBeast runs on the same host, add its Docker network to the service so the
 hub can reach it by name, and set `ASOBEAST_URL` to match.
