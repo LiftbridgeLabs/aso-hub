@@ -330,6 +330,8 @@ def _schedule_page(request: Request, cfg, conn, **context):
     tz = scheduler.zone(plan["timezone"])
     now = dt.datetime.now(dt.UTC)
     upcoming = {job: scheduler.slots(plan, job, now)[1] for job in ("pull", "digest")}
+    # Read before the history: a job that ends in between still leaves the page checking for its result.
+    running = JOBS.get(scheduler.current)
     runs = db.last_runs(conn)
     if not plan["enabled"]:
         upcoming = {}
@@ -339,7 +341,7 @@ def _schedule_page(request: Request, cfg, conn, **context):
             for job, name, sources in (("pull", "Data pull", (*collect.SOURCES, "discord")),
                                        ("digest", "Crash digest", ("crash_digest",)))]
     return page(request, "settings/schedule.html", cfg, conn, plan=plan, days=scheduler.DAYS,
-                zones=sorted(zoneinfo.available_timezones()), running=JOBS.get(scheduler.current), jobs=jobs,
+                zones=sorted(zoneinfo.available_timezones()), running=running, jobs=jobs,
                 **context)
 
 

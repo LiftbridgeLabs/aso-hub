@@ -201,6 +201,18 @@ def test_the_schedule_page_says_what_is_running(cfg, hub, monkeypatch):
     assert "The data pull is running." in body and body.count('class="quiet" disabled') == 2
 
 
+def test_a_job_ending_while_the_page_loads_is_still_watched(cfg, hub, monkeypatch):
+    read = db.last_runs
+
+    def finishes_first(conn):
+        scheduler.current = None
+        return read(conn)
+
+    monkeypatch.setattr(scheduler, "current", "pull")
+    monkeypatch.setattr(db, "last_runs", finishes_first)
+    assert "data-running" in hub.get("/settings/schedule").text
+
+
 def test_a_job_is_named_only_while_it_runs(cfg, monkeypatch):
     seen = []
     monkeypatch.setattr(scheduler, "_run", lambda job: seen.append(scheduler.current))
