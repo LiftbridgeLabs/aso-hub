@@ -184,7 +184,7 @@ def test_failures_go_to_admin_alerts(conn, digest_cfg, capsys):
     assert admin_url == ADMIN_HOOK
     assert admin.startswith("**ASO Hub crash digest for Nov 16–22: something failed**")
     assert "Tandem: no #alerts webhook saved (alerts-tandem)" in admin
-    assert "Nope is listed under [crash_digest]" in admin
+    assert "Nope is picked for the crash digest" in admin
     assert "Lumen, iOS (Apple): App Store Connect had a server error" in admin
     assert admin.endswith("Posted: Lumen.")
     assert "secret" not in capsys.readouterr().err

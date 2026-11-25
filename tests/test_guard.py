@@ -6,7 +6,9 @@ from aso_hub.access import AccessCheck
 
 
 @pytest.mark.parametrize("host, status", [("127.0.0.1:8690", 200), ("localhost", 200), ("[::1]:8690", 200),
-                                          ("hub.example.com", 200), ("attacker.example", 400), ("", 400)])
+                                          ("hub.example.com", 200), ("192.168.1.20:8690", 200),
+                                          ("attacker.example", 400), ("192.168.1.20.evil.example", 400),
+                                          ("", 400)])
 def test_only_known_addresses_are_answered(cfg, monkeypatch, host, status):
     monkeypatch.setenv("ASO_HUB_URL", "https://hub.example.com")
     assert TestClient(web.app).get("/", headers={"host": host}).status_code == status
@@ -14,8 +16,8 @@ def test_only_known_addresses_are_answered(cfg, monkeypatch, host, status):
 
 def test_extra_addresses_can_be_allowed(cfg, monkeypatch):
     page = TestClient(web.app)
-    monkeypatch.setenv("ASO_HUB_ALLOWED_HOSTS", "192.168.1.20")
-    assert page.get("/", headers={"host": "192.168.1.20:8690"}).status_code == 200
+    monkeypatch.setenv("ASO_HUB_ALLOWED_HOSTS", "nas.local")
+    assert page.get("/", headers={"host": "nas.local:8690"}).status_code == 200
     monkeypatch.setenv("ASO_HUB_ALLOWED_HOSTS", "*")
     assert page.get("/", headers={"host": "anything.example"}).status_code == 200
 

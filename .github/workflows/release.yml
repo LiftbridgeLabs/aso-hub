@@ -44,8 +44,13 @@ jobs:
         run: |
           docker run -d --name hub --read-only --tmpfs /tmp -p 127.0.0.1:8690:8690 "$IMAGE:$VERSION-${{ matrix.arch }}"
           curl --retry 15 --retry-delay 2 --retry-all-errors -fsS http://127.0.0.1:8690/healthz
-          curl -fsS -o /dev/null http://127.0.0.1:8690/ || { docker logs hub; exit 1; }
-          curl -fsS http://127.0.0.1:8690/settings | grep -q "ASO Hub $VERSION" || { docker logs hub; exit 1; }
+          curl -fsS http://127.0.0.1:8690/setup | grep -q "Create your account" || { docker logs hub; exit 1; }
+          docker logs hub 2>&1 | grep -q "Setup code:" || { docker logs hub; exit 1; }
+          test "$(docker exec hub python -c 'from aso_hub import status; print(status.VERSION)')" = "$VERSION"
+          # The schedule needs time zones, which a slim image can lack.
+          docker exec hub python -c 'from zoneinfo import ZoneInfo, available_timezones; ZoneInfo("America/Denver"); assert len(available_timezones()) > 300'
+          docker exec hub python -c 'import segno'
+          ! docker logs hub 2>&1 | grep -q Traceback
       - name: Push
         env:
           DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}

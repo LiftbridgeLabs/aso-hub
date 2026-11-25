@@ -119,7 +119,8 @@ def main() -> None:
     seed_keywords(conn, cfg)
     rules.evaluate(cfg, conn)
     conn.close()
-    print(f"Wrote {path}. Run it with: HUB_CONFIG=demo/config.toml DATABASE_PATH={path} python -m aso_hub serve")
+    print(f"Wrote {path}. Run it with: HUB_CONFIG=demo/config.toml DATABASE_PATH={path} ASO_HUB_SCHEDULER=off "
+          "python -m aso_hub serve (it prints the setup code for the first sign-in)")
 
 
 if __name__ == "__main__":

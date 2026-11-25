@@ -29,5 +29,5 @@ EXPOSE 8690
 HEALTHCHECK --interval=60s --timeout=5s --start-period=20s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8690/healthz', timeout=4)"
 
-# One process. The scheduled pull runs in this container through `docker exec` (see deploy/).
+# One process: the pages and the hub's own schedule.
 CMD ["python", "-m", "aso_hub", "serve"]

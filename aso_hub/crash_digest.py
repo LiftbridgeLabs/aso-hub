@@ -190,7 +190,7 @@ def run(settings: Settings, conn: sqlite3.Connection, today: dt.date | None = No
     wanted = settings.crash_digest.get("apps", [])
     top = int(settings.crash_digest.get("top_issues", 3))
     known = {a.name for a in settings.apps}
-    failures = [f"{n} is listed under [crash_digest] but isn't an app in config.toml." for n in wanted
+    failures = [f"{n} is picked for the crash digest but isn't one of the apps." for n in wanted
                 if n not in known]
     run_id = db.start_run(conn, "crash_digest")
     posted = []

@@ -1,39 +1,31 @@
-# ASO Hub from the published image. Put this file, config.toml and
-# .env.example (saved as .env) in one folder, or just clone the repository:
+# ASO Hub. Put this file in a folder, then:
 #
-#   mkdir -p data secrets && sudo chown 1001:1001 data
-#   docker compose up -d        then open http://127.0.0.1:8690
+#   docker compose up -d
+#   docker logs aso-hub          (shows the setup code)
 #
-# config.toml holds your apps and rules. secrets/ holds the key, token and webhook files, readable by
-# user 1001. Anything not set up yet is skipped, and the page says what hasn't been read.
+# Open http://127.0.0.1:8690, create your account, and set up the rest under Settings.
 services:
   aso-hub:
-    image: ${ASO_HUB_IMAGE:?set ASO_HUB_IMAGE in .env}:${ASO_HUB_VERSION:-latest}
+    image: liftbridgelabs/aso-hub:${ASO_HUB_VERSION:-latest}
     container_name: aso-hub
     restart: unless-stopped
-    env_file: .env
     environment:
-      HUB_CONFIG: /config/config.toml
-      ASC_KEY_PATH: /secrets/asc-key.p8
-      GOOGLE_KEY_PATH: /secrets/google-play.json
-      ASOBEAST_TOKEN_FILE: /secrets/asobeast-token
-      # New to-dos post to this Discord webhook, if the file exists.
-      DISCORD_WEBHOOK_FILE: /secrets/discord-webhook
-      # Weekly crash digest webhooks: alerts-<app> per app, and alerts-admin for failures.
-      ALERTS_WEBHOOK_DIR: /secrets
-      # The hub's own password, used once the file exists (set-secret.sh hub-password).
-      HUB_PASSWORD_FILE: /secrets/hub-password
-    # Listens on this machine only. To open it from elsewhere, save a password (or put a
-    # sign-in service in front) and use HTTPS, then change this line.
+      # The address you open the hub at, if it isn't an IP address or localhost,
+      # for example https://hub.example.com. Used for links and single sign-on.
+      ASO_HUB_URL: ${ASO_HUB_URL:-}
+    # Listens on this machine only. To open it from your network, change this to
+    # "8690:8690". From anywhere further, put it behind HTTPS first.
     ports:
       - "127.0.0.1:8690:8690"
     volumes:
-      - ./config.toml:/config/config.toml:ro
-      - ./data:/data
-      - ./secrets:/secrets:ro
+      # The database and, unless SECRET_KEY is set, the key that encrypts saved secrets.
+      - aso-hub-data:/data
     read_only: true
     tmpfs:
       - /tmp
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
+
+volumes:
+  aso-hub-data:

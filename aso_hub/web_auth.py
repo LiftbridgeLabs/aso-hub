@@ -239,13 +239,13 @@ def _change(request: Request, cfg, conn: sqlite3.Connection, action: str, form: 
         return response
     if action == "two-step-start":
         _confirm(conn, form, request)
-        secret, link = auth.begin_two_step(conn, cfg.database_path)
+        secret, link = auth.begin_two_step(conn, cfg.database_path, token)
         return _sign_in_page(request, cfg, conn, setup={"secret": secret, "qr": _qr(link)})
     if action == "two-step-confirm":
         try:
             codes = auth.confirm_two_step(conn, cfg.database_path, form.text("code"), token)
         except auth.AuthError as e:
-            secret, link = auth.begin_two_step(conn, cfg.database_path)
+            secret, link = auth.pending_two_step(conn, cfg.database_path, token)
             return _sign_in_page(request, cfg, conn, status=400, error=str(e),
                                  setup={"secret": secret, "qr": _qr(link)})
         return _sign_in_page(request, cfg, conn, codes=codes)
@@ -261,15 +261,18 @@ def _change(request: Request, cfg, conn: sqlite3.Connection, action: str, form: 
     if action == "allowed":
         _confirm(conn, form, request)
         db.set_setting(conn, "allowed_emails", oidc.parse_allowed(form.text("allowed")))
+        auth.end_other_sessions(conn, token)  # someone just removed from the list is signed out
         return saved("/settings/sign-in", "Allowed list saved.")
     if action == "provider":
         _confirm(conn, form, request)
         _save_provider(cfg, conn, form)
+        auth.end_other_sessions(conn, token)
         return saved("/settings/sign-in", "Sign-in provider saved. Use Try it to check it.")
     if action == "provider-remove":
         _confirm(conn, form, request)
         with conn:
             conn.execute("DELETE FROM sign_in_providers WHERE id = ?", (form.text("id"),))
+        auth.end_other_sessions(conn, token)
         return saved("/settings/sign-in", "Sign-in provider removed.")
     raise auth.AuthError("Unknown change.")
 

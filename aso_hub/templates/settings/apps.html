@@ -12,7 +12,7 @@
 {% for a in apps %}
 <section class="panel">
   <div class="panel-head"><h2>{{ a.label }}</h2>
-    <small>{{ a.store_id }} · from {{ "this page" if a.slug in mine else "AsoBeast" if a.auto else "config.toml" }}</small></div>
+    <small>{{ a.store_id }} · from {{ "this page" if a.slug in mine else "AsoBeast" if a.auto else "the settings file" }}</small></div>
   <form method="post" action="/settings/apps/edit" class="inline-form">
     <input type="hidden" name="slug" value="{{ a.slug }}">
     <label>Name <input type="text" name="name" value="{{ a.name }}" maxlength="60" required></label>

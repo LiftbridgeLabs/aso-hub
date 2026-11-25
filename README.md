@@ -10,69 +10,113 @@ digest to Discord.
 
 <img src="assets/icon/aso-hub-icon-180.png" alt="ASO Hub icon" width="90">
 
-**Quick start:** [run it with Docker](#run-it-with-docker) using
-[`docker-compose.yml`](docker-compose.yml).
-
 Shared as-is under the MIT license. Issues are welcome; there is no promise of
 support or a roadmap. It was built for one small team's apps, so expect rough
 edges outside that setup.
 
-**Setup is short:** every app you track in AsoBeast appears in the hub by
-itself, with the countries you track keywords in. You add your keys and run it.
-
 ![Overview page with sample data](docs/screenshot-overview.png)
 
-Screenshots show made-up numbers from `demo/seed.py`, which fills a throwaway
-database so you can look around without any keys:
-`python demo/seed.py /tmp/demo.db`, then
-`HUB_CONFIG=demo/config.toml DATABASE_PATH=/tmp/demo.db python -m aso_hub serve`.
+## Quick start
 
-## Your apps
+Save [`docker-compose.yml`](docker-compose.yml) in a folder, then:
 
-Track an app in AsoBeast and it shows up after the next pull. Nothing else to
-edit. `config.toml` is for the rest:
+```sh
+docker compose up -d
+docker logs aso-hub        # shows your setup code
+```
 
-- an app AsoBeast doesn't track: add an `[[apps]]` block (the file shows how);
-- a different name, page address or markets: an `[[apps]]` block with the same
-  store id wins over AsoBeast;
-- an app you don't want shown, such as one that isn't yours: put its store id in
-  `ignore` under `[asobeast]`, or set `add_apps = false`.
+1. Open http://127.0.0.1:8690, enter the setup code and choose a password.
+2. **Settings → Connections:** add your App Store Connect key, Google Play key
+   and AsoBeast token, and press **Test** on each. Use any you have.
+3. **Settings → Alerts:** paste a Discord webhook if you want messages.
+4. **Settings → Schedule:** set your time zone, then **Pull now**.
 
-Store numbers need the app to be in your own App Store Connect or Play account.
-The weekly crash digest posts only the apps listed under `[crash_digest]`.
+Every app you track in AsoBeast appears by itself. There are no files to edit.
+
+The image is
+[`liftbridgelabs/aso-hub`](https://hub.docker.com/r/liftbridgelabs/aso-hub), for
+Intel/AMD and ARM machines. To update: `docker compose pull && docker compose up -d`.
+The version you are on shows at the bottom of every page.
+
+**Opening it from other machines.** In `docker-compose.yml`, change the port line
+to `"8690:8690"`. An IP address such as `http://192.168.1.20:8690` then works.
+For a name (`https://hub.example.com`), set `ASO_HUB_URL` to it. Across the
+internet, use HTTPS through a reverse proxy or tunnel.
+
+**AsoBeast on the same machine:** add its Docker network to the service, and
+enter its address under Settings → Connections.
+
+## Settings
+
+The gear beside the name.
+
+| Page | What you set |
+|---|---|
+| Connections | Apple and Google keys, ids, AsoBeast address and token |
+| Apps | Add, rename or hide apps, choose markets |
+| Alerts | Discord webhooks, alert rules, the weekly crash digest, hidden keywords |
+| Schedule | When it pulls and sends the digest, in your time zone; run now |
+| Sign-in | Password, two-step sign-in, single sign-on |
+
+![Connections settings](docs/screenshot-settings.png)
+
+Store numbers need the app to be in your own App Store Connect or Play account;
+hide any that aren't yours.
+
+## Sign-in
+
+- **Account.** One owner account, created with the setup code from the log.
+- **Two-step sign-in.** A code from an authenticator app (set up by QR code),
+  with ten one-time recovery codes.
+- **Single sign-on** with any OpenID Connect provider (Pocket ID, Authentik,
+  Authelia, Google and others): create a client there with the redirect address
+  the page shows, add it, list who may sign in (addresses or `@domain`), and
+  press **Try it**. Your provider handles its own two-step sign-in.
+- **Cloudflare Access:** set `CF_ACCESS_AUD` and `CF_ACCESS_TEAM_DOMAIN` and the
+  hub trusts Access's signed pass instead of asking for a password.
+- **Locked out?** On the server:
+  `docker exec -it aso-hub python -m aso_hub reset-password`, or
+  `... turn-off-two-step`.
 
 ## Security
 
 - **Your data stays with you.** There is no hosted service: the hub runs on your
-  machine and talks only to Apple, Google, your AsoBeast and your Discord
-  webhooks. Pages also load app icons from the stores.
+  machine and talks only to Apple, Google, your AsoBeast, your sign-in provider
+  and your Discord webhooks. Pages also load app icons from the stores.
+- **Nothing is visible without signing in.** Ten wrong tries pause sign-in for 15
+  minutes (behind a proxy, everyone shares one address).
 - **Read-only access.** Use an App Store Connect key with the Sales role, a Play
   service account with view permissions and a read-only AsoBeast token. The hub
   never changes a listing.
-- **Local by default.** The compose file listens on this machine only.
-- **Sign-in for anything wider.** Once `ASO_HUB_URL` or the allowed hosts name
-  another address, the hub refuses to show anything without a sign-in: its own
-  password, Cloudflare Access, or a proxy you declare with
-  `ASO_HUB_BEHIND_SIGN_IN=true`.
-- **Optional password.** Save one of at least 12 characters with
-  `set-secret.sh hub-password`; the browser asks for it (any user name). Ten wrong
-  tries lock that address out for five minutes (behind a proxy, everyone shares
-  one address). A password sent over plain HTTP can be read on the network, so
-  use HTTPS from other machines. Don't publish the port straight to the internet.
-- **Known addresses only.** It answers to `localhost`, the host in `ASO_HUB_URL`
-  and any listed in `ASO_HUB_ALLOWED_HOSTS`, which stops other web pages from
-  reaching it through your browser (DNS rebinding).
-- **Locked-down container.** No root, read-only filesystem, no extra
-  capabilities; keys are read from files you mount read-only.
-- **Keys on disk.** The hub must read its keys without anyone typing anything,
-  so they are files in `secrets/`. The web pages never show or serve them, but
-  anyone with administrator access to the server can read them. Keep the folder
-  readable by the hub's user only, encrypt backups, and if the server is ever
-  compromised, revoke every key and webhook and make new ones. The database
-  holds your sales figures, so protect it the same way.
+- **Saved keys** are encrypted and never shown again; they can only be replaced
+  or removed. The encryption key is `SECRET_KEY`, or a file the hub makes beside
+  its database. A copied database is useless without it, but anyone with
+  administrator access to the server can get both. To keep backups of the data
+  folder safe too, set `SECRET_KEY` and store it elsewhere. If the server is ever
+  compromised, revoke every key and webhook.
+- **Other websites can't act for you:** changes are accepted only from the hub's
+  own pages, and it answers only to IP addresses, `localhost`, the host in
+  `ASO_HUB_URL` and names in `ASO_HUB_ALLOWED_HOSTS` (against DNS rebinding).
+- **Locked-down container.** No root, read-only filesystem, no extra capabilities.
+- A password sent over plain HTTP can be read on the network. Use HTTPS from
+  anywhere you don't trust, and don't publish the port straight to the internet.
 
 Found a security problem? Report it privately under the repository's
 **Security** tab, not in a public issue.
+
+## Upgrading from 1.x
+
+Your existing `docker-compose.yml`, `config.toml` and secret files keep working;
+anything you then save in the app takes their place.
+
+- The first visit asks you to create an account (unless Cloudflare Access signs
+  you in). A `hub-password` secret file from 1.1 or 1.2 becomes the account's
+  password.
+- The hub now pulls and sends the crash digest itself (07:00 and 13:00 UTC,
+  digest Mondays 08:00, until you change them). **Remove the timers or cron jobs**
+  you set up for `collect` and `crash-digest`, or set `ASO_HUB_SCHEDULER=off` to
+  keep yours.
+- `ASO_HUB_BEHIND_SIGN_IN` is no longer used.
 
 ## Pages
 
@@ -99,9 +143,6 @@ old stylesheet.
   Center, with a link to AsoBeast to snooze or dismiss) and "Worth knowing"
   (nothing to do about it directly, like low downloads).
 
-- **Settings** (the gear beside the name): view only. The version, which sign-in protects the hub, which
-  keys and webhooks it found (never their contents), your apps and where each
-  came from, and the alert rules.
 
 Every page footer shows the version and when each source last updated, and a
 failed pull shows a banner with the reason.
@@ -128,7 +169,7 @@ user in Play Console with two account permissions: "View app information and
 download bulk reports (read-only)" and "View financial data". The reports
 bucket (`gs://pubsite_prod_<id>`, shown under Download reports in Play Console)
 holds installs, store visitors, sales and earnings; Google can take a day or
-two to open it to a new account. Put the bucket name in `PLAY_BUCKET`.
+two to open it to a new account. Enter the bucket name under Settings → Connections.
 
 Checked against ASO Atlas for one ten-day stretch: downloads, impressions,
 page views and deletions matched every day.
@@ -149,15 +190,13 @@ Things learned building it:
 
 ## AsoBeast
 
-Read over HTTP (`ASOBEAST_URL`; inside a Docker network if AsoBeast runs on the
-same host) with a read-only token, built against AsoBeast 1.13.0.
+Read over HTTP with a read-only token, built against AsoBeast 1.13.0.
 Each pull saves the answers as that day's snapshots (`asobeast_snapshots`), all
 at once, so a failed pull leaves the last good day. Apps are matched by store id.
 
 - **Hidden keywords**: AsoBeast re-adds single words from the title, subtitle
   and keyword field every day (`source` TITLE, SUBTITLE or KEYWORD_FIELD). The
-  keyword tables hide those unless listed in `keep_single_words` in
-  `config.toml`; "show all" brings them back. Keywords you added (MANUAL)
+  keyword tables hide those unless you list them under Settings → Alerts; "show all" brings them back. Keywords you added (MANUAL)
   always show.
 - **"In the listing"**: AsoBeast counts a phrase as covered only when one field
   holds all of it, but Apple combines words across the title, subtitle and
@@ -173,7 +212,7 @@ at once, so a failed pull leaves the last good day. Apps are matched by store id
 
 ## Rules
 
-Thresholds live in `config.toml`. An action opens the first
+Switch rules on or off and change thresholds under Settings → Alerts. An action opens the first
 pull a rule fires, keeps its "since" date while it keeps firing, and resolves
 the first pull it doesn't.
 
@@ -194,21 +233,22 @@ Worth knowing:
 - A new rating in the last 3 days.
 
 **Discord:** after each pull, new to-dos (hub rules and open AsoBeast items)
-post to the Discord webhook saved as `discord-webhook` (one message, or more if
+post to the "New to-dos" Discord webhook (one message, or more if
 it runs past Discord's length limit), with a link to the Actions page. Each
 posts once, and again only if it resolves and comes back. "Worth knowing" and snoozed AsoBeast items don't post. A failed
 post is retried on the next pull. With no webhook saved, nothing posts.
 
 ## Weekly crash digest
 
-Run weekly (`deploy/asohub-crashes.timer`, `python -m aso_hub crash-digest`),
-one message per app listed under `[crash_digest]` in `config.toml`, to a
-Discord channel of your choice per app. It covers the last full week
-(Monday to Sunday) against the week before: crashes by app version on iOS,
-crashes and freezes (ANRs) by version code on Android, and the week's top
-Android issues with a link to each in Play Console. A week with nothing says
-"No crashes reported", so a Monday without a message means the job didn't run.
-iOS and Android of the same app share a message.
+One message per app you tick under Settings → Alerts, to a Discord channel of
+your choice. It covers the last full week (Monday to Sunday) against the week
+before: crashes by app version on iOS, crashes and freezes (ANRs) by version code
+on Android, and the week's top Android issues with a link to each in Play
+Console. A week with nothing says "No crashes reported", so a missing message
+means the job didn't run. iOS and Android of the same app share a message. A
+failed pull is said in the message; that, a failed post, or a ticked app with no
+webhook also posts to the "When a crash digest fails" webhook. Each app posts
+once per week.
 
 **What Apple's numbers include (checked Nov 2026).** The only crash source
 the hub's Sales-role key can read is the App Crashes analytics report, in the
@@ -225,75 +265,28 @@ build diagnostics (hangs, slow launches) and TestFlight crash feedback answer
 403 to a Sales key. Google counts every crash its users' phones report, with no
 minimum.
 
-**Where it posts.** Each app's webhook is a file in the secrets folder named
-`alerts-<app>` (`alerts-lumen`, `alerts-tandem`), saved with
-`./set-secret.sh alerts-lumen`. If a pull
-fails, the app's message says so in place of that store's numbers; that, a
-failed post, or a listed app with no webhook saved also posts to
-`alerts-admin` (a channel for failures), and the run exits with code 3. Any other failure (the container restarting,
-say) is retried every 10 minutes, up to 5 tries; if the container
-stays down past that, the missing Monday message is the only sign.
-An iOS app with no analytics report request yet gets a note, not a failure.
-Each app posts once per week; `crash-digest --again` posts the week again, and
-`crash-digest --dry-run` prints the messages without posting.
+## Settings in files (optional)
 
-## Running it locally
+Everything above can also come from files and environment variables, which the
+app's Settings override: `config.toml` (`HUB_CONFIG`) for apps and rules;
+`ASC_ISSUER_ID`, `ASC_KEY_ID`, `ASC_VENDOR_NUMBER`, `ASC_KEY_PATH`,
+`GOOGLE_KEY_PATH`, `PLAY_BUCKET`, `ASOBEAST_URL`, `ASOBEAST_WEB_URL`,
+`ASOBEAST_TOKEN_FILE`, `DISCORD_WEBHOOK_FILE`, `ALERTS_WEBHOOK_DIR`
+(`alerts-<app>` files). Others: `ASO_HUB_URL`, `ASO_HUB_ALLOWED_HOSTS`,
+`SECRET_KEY`, `SETUP_TOKEN` (your own setup code), `ASO_HUB_SCHEDULER=off`,
+`DATABASE_PATH`, `HOST`, `PORT`.
 
-Keep settings and secrets outside the repo, for example in `~/.config/aso-hub/`
-(a `hub.env` with the ids and key paths, the `.p8` key, `google-play.json`, and
-`asobeast-token` saved with `./set-secret.sh asobeast-token`).
+## Development
 
 ```sh
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-set -a; . ~/.config/aso-hub/hub.env; set +a
-.venv/bin/python -m aso_hub collect          # pull everything (or: collect asc)
 .venv/bin/python -m aso_hub serve            # http://127.0.0.1:8690
 .venv/bin/ruff check . && .venv/bin/pytest -q
 ```
 
-Environment variables: `ASC_ISSUER_ID`, `ASC_KEY_ID`, `ASC_VENDOR_NUMBER`,
-`ASC_KEY_PATH` (App Store Connect, a key with the Sales role), `GOOGLE_KEY_PATH`
-and `PLAY_BUCKET` (Google Play), `ASOBEAST_URL`, `ASOBEAST_TOKEN_FILE` and
-`ASOBEAST_WEB_URL` (your AsoBeast address, for links), `DISCORD_WEBHOOK_FILE`,
-`ALERTS_WEBHOOK_DIR`, `ASO_HUB_URL` (the hub's own address, for links in
-Discord posts).
-`HUB_PASSWORD_FILE` holds an optional password (see Security). If you use Cloudflare Access, set
-`CF_ACCESS_AUD` and `CF_ACCESS_TEAM_DOMAIN` and the hub also checks Access's
-signed pass (`access.py`).
-
-## Run it with Docker
-
-The image is published to Docker Hub as
-[`liftbridgelabs/aso-hub`](https://hub.docker.com/r/liftbridgelabs/aso-hub) for Intel/AMD and ARM machines. Put these
-in one folder: [`docker-compose.yml`](docker-compose.yml),
-[`config.toml`](config.toml) (usually fine as it is),
-[`set-secret.sh`](set-secret.sh) (saves a secret without showing it), and
-[`.env.example`](.env.example) saved as `.env` (or clone the repository, which
-has them all). Then:
-
-```sh
-mkdir -p data secrets && sudo chown 1001:1001 data
-docker compose up -d      # after adding secret files: sudo chown -R 1001:1001 secrets
-```
-
-Open http://127.0.0.1:8690. If you open it at any other address, set
-`ASO_HUB_URL` in `.env` to that address. Save secrets as files in `secrets/` (readable by user
-1001), for example
-`ASO_HUB_SECRETS=./secrets bash set-secret.sh asobeast-token`
-(with `sudo` once `secrets/` belongs to user 1001, then run the `chown` again).
-
-If AsoBeast runs on the same host, add its Docker network to the service so the
-hub can reach it by name, and set `ASOBEAST_URL` to match.
-
-The pull and the weekly crash digest run on a schedule you set on the host.
-`deploy/asohub.timer` and `asohub-crashes.timer` (with their `.service` files)
-are systemd units that do it through `docker exec`; copy them to
-`/etc/systemd/system/`, set the times and your user, and enable the timers.
-
-To update, run `docker compose pull && docker compose up -d`. If
-`ASO_HUB_VERSION` in `.env` is a number, that command stays on it: change it to
-the new release's number first, or to `latest`. The version you are on
-shows at the bottom of every page.
+To look around with made-up numbers (as in the screenshots):
+`python demo/seed.py /tmp/demo.db`, then
+`HUB_CONFIG=demo/config.toml DATABASE_PATH=/tmp/demo.db ASO_HUB_SCHEDULER=off python -m aso_hub serve`.
 
 ## Checks
 

@@ -1,7 +1,8 @@
 """Who the hub answers.
 
-- Only addresses it knows. Without that, a web page you visit could point its own
-  domain name at your hub's local address and read it (DNS rebinding).
+- Only addresses it knows: this machine, any IP address, and the names you give
+  it. Without that, a web page you visit could point its own domain name at your
+  hub's local address and reach it (DNS rebinding).
 - Changes only from the hub's own pages, so another website can't submit one
   through your browser.
 - Pages only to someone signed in: with the account, a single sign-on, or
@@ -9,6 +10,7 @@
 - Each page tells the browser to run only the hub's own scripts and never to show
   the hub inside another site.
 """
+import ipaddress
 import os
 from urllib.parse import urlsplit
 
@@ -37,8 +39,18 @@ HEADERS = {
 }
 
 
+def is_address(host: str | None) -> bool:
+    """Whether the browser was given a number (192.168.1.20), which nobody else's domain can stand in for."""
+    try:
+        ipaddress.ip_address(host or "")
+    except ValueError:
+        return False
+    return True
+
+
 def allowed_hosts() -> set[str]:
-    """This machine, the host of ASO_HUB_URL, and any in ASO_HUB_ALLOWED_HOSTS ("*" allows all)."""
+    """Names the hub answers to: localhost, the host of ASO_HUB_URL, and any in ASO_HUB_ALLOWED_HOSTS
+    ("*" allows all). IP addresses are always answered."""
     hosts = set(LOCAL_HOSTS)
     own = urlsplit(os.environ.get("ASO_HUB_URL", "")).hostname
     if own:
@@ -76,7 +88,7 @@ class Guard(BaseHTTPMiddleware):
         except ValueError:
             host = None
         allowed = allowed_hosts()
-        if "*" not in allowed and host not in allowed:
+        if "*" not in allowed and host not in allowed and not is_address(host):
             return PlainTextResponse(
                 "The hub doesn't answer to this address. Set ASO_HUB_URL to the address you open it at, "
                 "or list it in ASO_HUB_ALLOWED_HOSTS.", status_code=400)

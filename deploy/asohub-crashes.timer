@@ -1,9 +1,0 @@
-[Unit]
-Description=Schedule for asohub-crashes (Mondays 8:00 AM Eastern)
-
-[Timer]
-OnCalendar=Mon *-*-* 08:00:00 America/New_York
-Persistent=true
-
-[Install]
-WantedBy=timers.target

@@ -14,6 +14,7 @@
 </section>
 <section class="panel">
   <h2>Next and last runs</h2>
+  <div class="scroll">
   <table class="settings">
     {% for job, name, source in [("pull", "Data pull", "asc"), ("digest", "Crash digest", "crash_digest")] %}
     <tr><td>{{ name }}</td>
@@ -21,6 +22,7 @@
       <td>{% set last = runs.get(source, {}).get("last") %}{% if last %}Last: {{ last.finished_at | short_date }}, {{ "ok" if last.ok else "failed" }}{% else %}Never run{% endif %}</td></tr>
     {% endfor %}
   </table>
+  </div>
   {% if running %}<p>Something is running now. Reload to see when it finishes.</p>{% endif %}
   <div class="row">
     <form method="post" action="/settings/schedule/pull"><button class="quiet">Pull now</button></form>

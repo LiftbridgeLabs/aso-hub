@@ -210,7 +210,7 @@ def _change_apps(cfg: Settings, conn: sqlite3.Connection, action: str, form: for
         return "Saved."
     if action == "reset":
         db.set_setting(conn, "apps", [a for a in db.get_setting(conn, "apps", []) if a["slug"] != app.slug] or None)
-        return "Back to what config.toml or AsoBeast says (an app added here is removed)."
+        return "Back to what AsoBeast or the settings file says (an app added here is removed)."
     if action == "hide":
         db.set_setting(conn, "hidden", [*hidden, app.store_id])
         return f"{app.label} hidden. Its saved numbers are kept."

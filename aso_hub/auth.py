@@ -188,8 +188,10 @@ def two_step_on(conn: sqlite3.Connection) -> bool:
     return bool(row and row["totp_on"])
 
 
-def begin_two_step(conn: sqlite3.Connection, database: Path) -> tuple[str, str]:
-    """A new secret for the authenticator app, and the link its QR code holds. Not on until confirmed."""
+def begin_two_step(conn: sqlite3.Connection, database: Path, token: str | None) -> tuple[str, str]:
+    """A secret for the authenticator app, and the link its QR code holds. Not on until
+    confirmed. Remembers which browser asked: it just gave the password, so only it
+    may see the secret again or confirm it."""
     row = account(conn)
     if row is None:
         raise AuthError("Create a password first.")
@@ -200,6 +202,17 @@ def begin_two_step(conn: sqlite3.Connection, database: Path) -> tuple[str, str]:
         secret = totp.new_secret()
         with conn:
             conn.execute("UPDATE account SET totp_secret = ? WHERE id = 1", (crypto.encrypt(database, secret),))
+    db.set_setting(conn, "two_step_browser", _fingerprint(token or ""))
+    return secret, totp.setup_uri(secret, account="owner")
+
+
+def pending_two_step(conn: sqlite3.Connection, database: Path, token: str | None) -> tuple[str, str]:
+    """The setup under way, for the browser that started it."""
+    row = account(conn)
+    mine = db.get_setting(conn, "two_step_browser") == _fingerprint(token or "")
+    secret = crypto.decrypt(database, row["totp_secret"]) if row and row["totp_secret"] else None
+    if not (mine and secret) or row["totp_on"]:
+        raise AuthError("Start setting up two-step sign-in again.")
     return secret, totp.setup_uri(secret, account="owner")
 
 
@@ -223,13 +236,13 @@ def new_recovery_codes(conn: sqlite3.Connection) -> list[str]:
 
 
 def confirm_two_step(conn: sqlite3.Connection, database: Path, code: str, token: str | None) -> list[str]:
-    row = account(conn)
-    secret = crypto.decrypt(database, row["totp_secret"]) if row and row["totp_secret"] else None
-    step = totp.matching_step(secret, code, now=time.time()) if secret else None
+    secret, _ = pending_two_step(conn, database, token)
+    step = totp.matching_step(secret, code, now=time.time())
     if step is None:
         raise AuthError("That code isn't right. Check that your phone's clock is set automatically.")
     with conn:
         conn.execute("UPDATE account SET totp_on = 1, totp_step = ? WHERE id = 1", (step,))
+    db.set_setting(conn, "two_step_browser", None)
     end_other_sessions(conn, token)  # other browsers sign in again, now with a code
     return new_recovery_codes(conn)
 

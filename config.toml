@@ -1,9 +1,8 @@
-# ASO Hub settings: your apps, markets and rule thresholds. No secrets here.
+# ASO Hub's starting settings. No secrets here.
 #
-# You may not need to change anything. Every app you track in AsoBeast shows up
-# by itself, with the countries you track keywords in. Edit this file to add an
-# app AsoBeast doesn't track, to rename one, or to tune the rules. A change
-# applies on the next pull or page load (restart the hub if it doesn't).
+# You don't need this file: set up apps and rules in the app, under Settings.
+# What you save there wins over this file. To keep settings in a file anyway,
+# mount your copy and point HUB_CONFIG at it.
 
 [asobeast]
 add_apps = true
@@ -89,11 +88,11 @@ enabled = true
 days = 7
 many_users = 3
 
-# The weekly crash digest (Mondays, 8:00 AM server time): one message per app to
+# The weekly crash digest: one message per app to
 # that app's own #alerts channel, with the last week's crashes and freezes
-# against the week before. Each listed app needs its #alerts webhook saved on
-# the server as alerts-<app> (alerts-myapp); a listed app
-# without one is reported as a failure in the alerts-admin channel. iOS and
+# against the week before. Each listed app needs its Discord webhook (saved
+# under Settings, Alerts); a listed app
+# without one is reported as a failure. iOS and
 # Android of the same app share one message.
 [crash_digest]
 apps = []   # app names, as shown on the pages

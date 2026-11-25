@@ -9,9 +9,11 @@
 </section>
 <section class="panel">
   <h2>Connections</h2>
+  <div class="scroll">
   <table class="settings">
     {% for c in connections %}<tr><td>{{ c.name }}</td><td>{{ chip(c.ok, c.state) }}</td></tr>{% endfor %}
   </table>
+  </div>
   <p><a href="/settings/connections">Set up connections</a></p>
 </section>
 <section class="panel">

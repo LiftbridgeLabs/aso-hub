@@ -1,9 +1,9 @@
 {% extends "settings/_base.html" %}
 {% from "settings/_macros.html" import chip, keyfile, actions %}
-{% macro idfield(name, label, value, help="") -%}
+{% macro idfield(name, label, value, help="", show=false) -%}
 <label>{{ label }}
   <input type="text" name="{{ name }}" value="{{ ids.get(name, '') }}" autocomplete="off" spellcheck="false"
-    placeholder="{{ 'Set outside the hub; type to replace' if value and not ids.get(name) else help }}"></label>
+    placeholder="{{ ('Now: ' ~ value) if show and value and not ids.get(name) else 'Set outside the hub; type to replace' if value and not ids.get(name) else help }}"></label>
 {% if ids.get(name) %}<label class="check"><input type="checkbox" name="clear_{{ name }}"> Remove the saved {{ label | lower }} (when left empty)</label>{% endif %}
 {%- endmacro %}
 {% block heading %}Connections{% endblock %}
@@ -40,8 +40,8 @@
   <div class="panel-head"><h2>AsoBeast</h2>{{ chip(state["asobeast-token"].ok, "Token: " ~ state["asobeast-token"].state) }}</div>
   <form method="post" action="/settings/connections/save" class="fields-form">
     <input type="hidden" name="which" value="asobeast">
-    {{ idfield("asobeast_url", "Address the hub reads", hub.asobeast_url, "http://asobeast-api:4000") }}
-    {{ idfield("asobeast_web_url", "Address you open in the browser", hub.asobeast_web_url, "For links to AsoBeast") }}
+    {{ idfield("asobeast_url", "Address the hub reads", hub.asobeast_url, show=true) }}
+    {{ idfield("asobeast_web_url", "Address you open in the browser", hub.asobeast_web_url if hub.asobeast_web_url != "https://asobeast.example" else "", "For links to AsoBeast", show=true) }}
     <label>Read-only token
       <input type="password" name="token" autocomplete="off" placeholder="Leave empty to keep what's saved"></label>
     <button>Save AsoBeast</button>

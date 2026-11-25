@@ -138,6 +138,22 @@ def test_two_step_sign_in(owner, conn_, cfg):
     assert owner.post("/login/code", data={"code": codes[0]}).status_code == 401  # a recovery code works once
 
 
+def test_only_the_browser_that_gave_the_password_can_finish_two_step_setup(owner, conn_):
+    owner.post("/settings/sign-in/two-step-start", data={"current": PASSWORD})
+    thief = TestClient(web.app, headers=OWN, follow_redirects=False)
+    thief.cookies.set(guard.SESSION_COOKIE, auth.start_session(conn_))  # signed in, without the password
+    r = thief.post("/settings/sign-in/two-step-confirm", data={"code": "000000"})
+    assert r.status_code == 400 and "Start setting up two-step sign-in again" in r.text
+    assert not re.search(r"<code>[A-Z2-7]{32}</code>", r.text) and "<svg viewBox" not in r.text.split("<main>")[1]
+
+
+def test_changing_who_may_sign_in_signs_other_browsers_out(owner, conn_):
+    other = auth.start_session(conn_)
+    owner.post("/settings/sign-in/allowed", data={"current": PASSWORD, "allowed": "me@example.com"})
+    assert not auth.session_ok(conn_, other)
+    assert owner.get("/").status_code == 200
+
+
 def test_the_code_step_cant_be_reached_without_the_password(owner):
     owner.cookies.clear()
     assert owner.get("/login/code").headers["location"] == "/login"

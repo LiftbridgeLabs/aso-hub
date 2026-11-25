@@ -84,6 +84,6 @@
 {% if account and not access %}
 <form method="post" action="/logout"><button class="quiet">Sign out</button></form>
 {% endif %}
-<p class="note">The hub answers to: {{ hosts | join(", ") }}. Locked out? On the server:
+<p class="note">The hub answers to IP addresses and: {{ hosts | join(", ") }}. Locked out? On the server:
   <code>docker exec -it aso-hub python -m aso_hub reset-password</code></p>
 {% endblock %}

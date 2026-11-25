@@ -8,8 +8,8 @@
 {% if not cards %}
 <section class="panel">
   <h2>No apps yet</h2>
-  <p>Track an app in AsoBeast, or add one to <code>config.toml</code>. It shows up after the next pull;
-    to pull now, run <code>docker exec aso-hub python -m aso_hub collect</code>.</p>
+  <p><a href="/settings/connections">Connect AsoBeast and your stores</a>, or <a href="/settings/apps">add an app</a>.
+    Then pull the numbers under <a href="/settings/schedule">Schedule</a>.</p>
 </section>
 {% endif %}
 <div class="cards">
