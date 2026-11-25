@@ -28,14 +28,17 @@ def secrets(conn: sqlite3.Connection, settings: Settings) -> tuple[dict[str, str
     return opened, broken
 
 
-def save_secret(conn: sqlite3.Connection, settings: Settings, name: str, value: str | None) -> None:
-    """Save one secret encrypted, or with None remove it, so a secret file applies again."""
-    with conn:
-        if value is None:
-            conn.execute("DELETE FROM app_secrets WHERE name = ?", (name,))
-        else:
-            conn.execute("INSERT OR REPLACE INTO app_secrets VALUES (?, ?, ?)",
-                         (name, crypto.encrypt(settings.database_path, value), db.now()))
+def save_secret(conn: sqlite3.Connection, settings: Settings, name: str, value: str | None,
+                commit: bool = True) -> None:
+    """Save one secret encrypted, or with None remove it, so a secret file applies again.
+    With `commit` false it joins the caller's transaction."""
+    if value is None:
+        conn.execute("DELETE FROM app_secrets WHERE name = ?", (name,))
+    else:
+        conn.execute("INSERT OR REPLACE INTO app_secrets VALUES (?, ?, ?)",
+                     (name, crypto.encrypt(settings.database_path, value), db.now()))
+    if commit:
+        conn.commit()
 
 
 def apps(conn: sqlite3.Connection, settings: Settings) -> tuple[list[App], frozenset[str]]:
@@ -50,7 +53,19 @@ def apps(conn: sqlite3.Connection, settings: Settings) -> tuple[list[App], froze
 
 
 def effective(settings: Settings, conn: sqlite3.Connection) -> Settings:
-    """`settings` as read from files, with everything saved in the app applied."""
+    """`settings` as read from files, with everything saved in the app applied, all read
+    from one moment: never a new address beside an old token."""
+    ours = not conn.in_transaction
+    if ours:
+        conn.execute("BEGIN")
+    try:
+        return _effective(settings, conn)
+    finally:
+        if ours:
+            conn.commit()
+
+
+def _effective(settings: Settings, conn: sqlite3.Connection) -> Settings:
     changes: dict = {}
     ids = db.get_setting(conn, "ids", {})
     changes |= {key: ids[key] for key in IDS if ids.get(key)}

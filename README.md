@@ -38,6 +38,15 @@ The image is
 Intel/AMD and ARM machines. To update: `docker compose pull && docker compose up -d`.
 The version you are on shows at the bottom of every page.
 
+| Image tag | What you get |
+|---|---|
+| `latest` (default) | The newest release |
+| `2.0.0` and other numbers | That release, until you change it |
+| `dev` | The newest code, rebuilt on every change after its tests and scans pass. It isn't released yet, so expect rough edges; back up the data folder first, since going back to an older version isn't tested |
+
+To follow `dev`, start with `ASO_HUB_VERSION=dev docker compose up -d`, or change
+the image line.
+
 **Opening it from other machines.** In `docker-compose.yml`, change the port line
 to `"8690:8690"`. An IP address such as `http://192.168.1.20:8690` then works.
 For a name (`https://hub.example.com`), set `ASO_HUB_URL` to it. Across the
@@ -118,6 +127,21 @@ anything you then save in the app takes their place.
   keep yours.
 - `ASO_HUB_BEHIND_SIGN_IN` is no longer used.
 
+**Changing to the new `docker-compose.yml`** isn't needed. If you want to, note
+that it keeps the database in a Docker volume named `aso-hub-data`, not in your
+`./data` folder, and would start empty. Copy the old data (the database and
+`secret.key`) across first, from the folder with your old compose file:
+
+```sh
+docker compose down
+docker run --rm --user 0 -v "$PWD/data:/from:ro" -v aso-hub-data:/to \
+  liftbridgelabs/aso-hub:latest sh -c 'cp -a /from/. /to/ && chown -R 1001:1001 /to'
+```
+
+Then put the new file in place and run `docker compose up -d`. The new file
+doesn't mount `config.toml` or `secrets/`: enter those under Settings, or add the
+mounts and their variables to it. Keep `./data` until you've checked the new one.
+
 ## Pages
 
 Every page takes a time range: 7 days, 30 days, 3 months or 12 months
@@ -144,8 +168,8 @@ old stylesheet.
   (nothing to do about it directly, like low downloads).
 
 
-Every page footer shows the version and when each source last updated, and a
-failed pull shows a banner with the reason.
+A bar at the bottom shows the version, when each source was last read and links
+to this project. A failed pull shows a banner with the reason.
 
 ## Where the numbers come from
 

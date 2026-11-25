@@ -39,12 +39,22 @@
     {% endfor %}
     {% block content %}{% endblock %}
   </main>
-  <footer class="fresh">
-    {% for s in sources %}
-    <span class="{{ 'ok' if s.ok else 'bad' }}">{{ s.name }}:
-      {% if s.last_ok_at %}updated {{ s.last_ok_at | short_date }}{% else %}not read yet{% endif %}</span>
-    {% endfor %}
-    <a class="version" href="/settings">ASO Hub {{ version }}</a>
+  <footer class="bar">
+    <div class="wrap">
+      <div class="about"><span class="mark" aria-hidden="true"></span><strong>ASO Hub</strong>
+        <a class="version" href="/settings">Version {{ version }}</a></div>
+      <div class="fresh" aria-label="Last updated"><b>Updated</b>
+        {% for s in sources %}
+        <span class="{{ 'ok' if s.ok else 'bad' }}">{{ s.name }}:
+          {% if s.last_ok_at %}{{ s.last_ok_at | short_date }}{% else %}not read yet{% endif %}</span>
+        {% endfor %}
+      </div>
+      <nav aria-label="About ASO Hub">
+        {% for label, address in [("GitHub", ""), ("Report an issue", "/issues"), ("Documentation", "#readme")] %}
+        <a href="https://github.com/LiftbridgeLabs/aso-hub{{ address }}" target="_blank" rel="noopener noreferrer">{{ label }}</a>
+        {% endfor %}
+      </nav>
+    </div>
   </footer>
 </body>
 </html>

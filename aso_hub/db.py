@@ -200,7 +200,8 @@ CREATE TABLE IF NOT EXISTS sign_in_providers (
     issuer TEXT NOT NULL,
     client_id TEXT NOT NULL,
     client_secret TEXT NOT NULL,            -- encrypted
-    enabled INTEGER NOT NULL DEFAULT 1
+    enabled INTEGER NOT NULL DEFAULT 1,
+    trust_email INTEGER NOT NULL DEFAULT 0  -- accept addresses it doesn't call verified
 );
 
 -- Single sign-ons on their way to the provider and back; each state works once.
@@ -245,13 +246,15 @@ def get_setting(conn: sqlite3.Connection, key: str, default=None):
     return json.loads(row["value"]) if row else default
 
 
-def set_setting(conn: sqlite3.Connection, key: str, value) -> None:
-    """Save one in-app setting; None removes it, so the file or default applies again."""
-    with conn:
-        if value is None:
-            conn.execute("DELETE FROM app_settings WHERE key = ?", (key,))
-        else:
-            conn.execute("INSERT OR REPLACE INTO app_settings VALUES (?, ?)", (key, json.dumps(value)))
+def set_setting(conn: sqlite3.Connection, key: str, value, commit: bool = True) -> None:
+    """Save one in-app setting; None removes it, so the file or default applies again.
+    With `commit` false it joins the caller's transaction."""
+    if value is None:
+        conn.execute("DELETE FROM app_settings WHERE key = ?", (key,))
+    else:
+        conn.execute("INSERT OR REPLACE INTO app_settings VALUES (?, ?)", (key, json.dumps(value)))
+    if commit:
+        conn.commit()
 
 
 def start_run(conn: sqlite3.Connection, source: str) -> int:

@@ -1,14 +1,22 @@
-# Publish the image to Docker Hub when a version tag (v1.0.0) is pushed, only after the
-# tests and scans pass. Each CPU type is built and started on its own kind of runner,
-# then the two are joined under one tag.
+# Publish the image to Docker Hub, only after the tests and scans pass:
+#   a version tag (v1.0.0) -> :1.0.0 and :latest
+#   every push to main     -> :dev (the newest code, before it is released)
+# Each CPU type is built and started on its own kind of runner, then the two are
+# joined under one name.
 name: Release
 
 on:
   push:
+    branches: [main]
     tags: ["v*.*.*"]
 
 permissions:
   contents: read
+
+# A newer push to main replaces a :dev build still running. Releases never cancel.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type == 'branch' }}
 
 env:
   IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/aso-hub
@@ -37,12 +45,17 @@ jobs:
           persist-credentials: false
       - name: Build
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          docker build --build-arg VERSION="$version" -t "$IMAGE:$version-${{ matrix.arch }}" .
-          echo "VERSION=$version" >> "$GITHUB_ENV"
+          # A release shows its number; a :dev build shows which commit it is.
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version="${GITHUB_REF_NAME#v}"; name="$version"
+          else
+            version="dev-${GITHUB_SHA::7}"; name="dev"
+          fi
+          docker build --build-arg VERSION="$version" -t "$IMAGE:$name-${{ matrix.arch }}" .
+          { echo "VERSION=$version"; echo "NAME=$name"; } >> "$GITHUB_ENV"
       - name: Start it and load the page
         run: |
-          docker run -d --name hub --read-only --tmpfs /tmp -p 127.0.0.1:8690:8690 "$IMAGE:$VERSION-${{ matrix.arch }}"
+          docker run -d --name hub --read-only --tmpfs /tmp -p 127.0.0.1:8690:8690 "$IMAGE:$NAME-${{ matrix.arch }}"
           curl --retry 15 --retry-delay 2 --retry-all-errors -fsS http://127.0.0.1:8690/healthz
           curl -fsS http://127.0.0.1:8690/setup | grep -q "Create your account" || { docker logs hub; exit 1; }
           docker logs hub 2>&1 | grep -q "Setup code:" || { docker logs hub; exit 1; }
@@ -57,22 +70,25 @@ jobs:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-          docker push "$IMAGE:$VERSION-${{ matrix.arch }}"
+          docker push "$IMAGE:$NAME-${{ matrix.arch }}"
 
   publish:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Join the two builds under the version and latest
+      - name: Join the two builds (a release also moves latest)
         env:
           DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            name="${GITHUB_REF_NAME#v}"; tags=(-t "$IMAGE:$name" -t "$IMAGE:latest")
+          else
+            name="dev"; tags=(-t "$IMAGE:dev")
+          fi
           echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-          docker buildx imagetools create -t "$IMAGE:$version" -t "$IMAGE:latest" \
-            "$IMAGE:$version-amd64" "$IMAGE:$version-arm64"
+          docker buildx imagetools create "${tags[@]}" "$IMAGE:$name-amd64" "$IMAGE:$name-arm64"
 
   alert:
     needs: [tests, security, build, publish]

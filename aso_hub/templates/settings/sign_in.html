@@ -70,6 +70,8 @@
     <label>Client ID <input type="text" name="client_id" value="{{ p.client_id if p else '' }}" autocomplete="off" required></label>
     <label>Client secret <input type="password" name="client_secret" autocomplete="off" placeholder="{{ 'Leave empty to keep what is saved' if p else '' }}"{% if not p %} required{% endif %}></label>
     <label class="check"><input type="checkbox" name="enabled"{% if not p or p.enabled %} checked{% endif %}> Show on the sign-in page</label>
+    <label class="check"><input type="checkbox" name="trust_email"{% if p and p.trust_email %} checked{% endif %}>
+      Accept email addresses it doesn't mark as verified (only for a provider you control)</label>
     {{ confirm(account) }}
     <button{% if p %} class="quiet"{% endif %}>Save provider</button>
   </form>

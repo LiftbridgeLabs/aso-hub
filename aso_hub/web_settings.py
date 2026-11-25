@@ -47,7 +47,7 @@ def _secret_text(name: str, value: str) -> str:
     return value
 
 
-def _save_ids(conn: sqlite3.Connection, form: forms.Form, names: tuple[str, ...]) -> None:
+def _save_ids(conn: sqlite3.Connection, form: forms.Form, names: tuple[str, ...], commit: bool = True) -> None:
     ids = db.get_setting(conn, "ids", {})
     for name in names:
         value = form.text(name)
@@ -55,7 +55,7 @@ def _save_ids(conn: sqlite3.Connection, form: forms.Form, names: tuple[str, ...]
             ids[name] = value
         elif form.on(f"clear_{name}"):
             ids.pop(name, None)
-    db.set_setting(conn, "ids", ids)
+    db.set_setting(conn, "ids", ids, commit=commit)
 
 
 def _save_connection(cfg: Settings, conn: sqlite3.Connection, which: str, form: forms.Form) -> str:
@@ -86,9 +86,10 @@ def _save_connection(cfg: Settings, conn: sqlite3.Connection, which: str, form: 
         moving = form.text("asobeast_url") and form.text("asobeast_url") != cfg.asobeast_url
         if (moving or form.on("clear_asobeast_url")) and not token:
             raise Refused("Enter the token again when you change AsoBeast's address.")
-        _save_ids(conn, form, ("asobeast_url", "asobeast_web_url"))
-        if token:
-            overlay.save_secret(conn, cfg, "asobeast-token", token)
+        with conn:  # address and token change together, never one without the other
+            _save_ids(conn, form, ("asobeast_url", "asobeast_web_url"), commit=False)
+            if token:
+                overlay.save_secret(conn, cfg, "asobeast-token", token, commit=False)
     else:
         raise Refused("Unknown connection.")
     return "Saved. Use Test to check it."
@@ -187,7 +188,9 @@ def _change_apps(cfg: Settings, conn: sqlite3.Connection, action: str, form: for
         name = _app_name(form.text("name"))
         base = SLUG.sub("-", name.lower()).strip("-")[:40] or "app"
         slug, n = f"{base}-{discover.SUFFIX[store]}", 2
-        while cfg.app(slug):
+        # A hidden app keeps its page address, ready for when it is shown again.
+        taken = {a["slug"] for a in db.get_setting(conn, "apps", [])}
+        while cfg.app(slug) or slug in taken:
             slug, n = f"{base}-{n}-{discover.SUFFIX[store]}", n + 1
         id_key = "apple_id" if store == "app_store" else "google_package"
         db.set_setting(conn, "hidden", [h for h in hidden if h != sid] or None)

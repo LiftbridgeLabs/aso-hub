@@ -6,6 +6,7 @@ import logging
 import re
 import sqlite3
 import threading
+from collections.abc import Iterator
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from . import collect, crash_digest, db, overlay, settings
@@ -48,30 +49,26 @@ def slots(plan: dict, job: str, now: dt.datetime) -> tuple[dt.datetime | None, d
     return (max(past) if past else None), (min(later) if later else None)
 
 
-def due(conn: sqlite3.Connection, now: dt.datetime) -> list[str]:
-    """The jobs whose time has come since they last ran. Marks them taken, so a
-    failing job waits for its next time instead of repeating every tick."""
-    plan = schedule(conn)
-    if not plan["enabled"]:
-        return []
-    done = db.get_setting(conn, "schedule_done", {})
-    jobs = []
+def due(conn: sqlite3.Connection, now: dt.datetime) -> Iterator[str]:
+    """The jobs whose time has come since they last ran, one at a time. Each is marked
+    taken only as it is handed out: a failing job waits for its next time, and one not
+    reached before a restart is still due after it."""
     for job in ("pull", "digest"):
+        plan = schedule(conn)
+        if not plan["enabled"]:
+            return
         latest, _ = slots(plan, job, now)
         if latest is None:
             continue
         mark = latest.astimezone(dt.UTC).isoformat()
-        if job not in done:
-            # A new hub pulls straight away; the digest waits for its day.
-            if job == "pull":
-                jobs.append(job)
-        elif mark > done[job]:
-            jobs.append(job)
-        else:
+        done = db.get_setting(conn, "schedule_done", {})
+        if job in done and mark <= done[job]:
             continue
-        done[job] = mark
-    db.set_setting(conn, "schedule_done", done)
-    return jobs
+        first = job not in done
+        db.set_setting(conn, "schedule_done", done | {job: mark})
+        # A new hub pulls straight away; the digest waits for its day.
+        if not (first and job == "digest"):
+            yield job
 
 
 def run_job(job: str) -> None:
@@ -113,14 +110,13 @@ def tick(now: dt.datetime | None = None) -> None:
     try:
         conn = db.connect(base.database_path)
         try:
-            jobs = due(conn, now or dt.datetime.now(dt.UTC))
+            for job in due(conn, now or dt.datetime.now(dt.UTC)):
+                try:
+                    run_job(job)
+                except Exception:
+                    log.exception("the scheduled %s failed", job)
         finally:
             conn.close()
-        for job in jobs:
-            try:
-                run_job(job)
-            except Exception:
-                log.exception("the scheduled %s failed", job)
     finally:
         RUNNING.release()
 

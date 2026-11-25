@@ -289,14 +289,14 @@ def _save_provider(cfg, conn: sqlite3.Connection, form: forms.Form) -> None:
     with oidc.client() as http:
         oidc.discover(http, issuer)
     sealed = crypto.encrypt(cfg.database_path, secret) if secret else old["client_secret"]
-    values = (name[:60], issuer, client_id, sealed, int(form.on("enabled")))
+    values = (name[:60], issuer, client_id, sealed, int(form.on("enabled")), int(form.on("trust_email")))
     with conn:
         if old is None:
-            conn.execute("INSERT INTO sign_in_providers (name, issuer, client_id, client_secret, enabled) "
-                         "VALUES (?, ?, ?, ?, ?)", values)
+            conn.execute("INSERT INTO sign_in_providers (name, issuer, client_id, client_secret, enabled, trust_email) "
+                         "VALUES (?, ?, ?, ?, ?, ?)", values)
         else:
             conn.execute("UPDATE sign_in_providers SET name = ?, issuer = ?, client_id = ?, client_secret = ?, "
-                         "enabled = ? WHERE id = ?", (*values, old["id"]))
+                         "enabled = ?, trust_email = ? WHERE id = ?", (*values, old["id"]))
 
 
 @router.post("/settings/sign-in/{action}", response_class=HTMLResponse)

@@ -45,4 +45,5 @@ def test_a_missing_or_unreadable_secret_is_said_not_raised(cfg, tmp_path):
 
 def test_every_page_shows_the_version(cfg):
     for path in ("/", "/actions", "/settings"):
-        assert f"ASO Hub {status.VERSION}" in TestClient(web.app).get(path).text
+        text = TestClient(web.app).get(path).text
+        assert f"Version {status.VERSION}" in text and "github.com/LiftbridgeLabs/aso-hub/issues" in text

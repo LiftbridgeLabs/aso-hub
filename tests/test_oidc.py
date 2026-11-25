@@ -102,6 +102,25 @@ def test_a_wrong_answer_signs_nobody_in(owner, provider, change):
     assert owner.get("/").status_code == 303
 
 
+def test_an_address_not_called_verified_needs_the_providers_trust_ticked(owner, provider):
+    del provider.claims["email_verified"]
+    assert back(owner, go(owner, provider)).status_code == 401
+    owner.post("/login", data={"password": PASSWORD})
+    r = owner.post("/settings/sign-in/provider", data={
+        "current": PASSWORD, "id": "1", "name": "Home ID", "issuer": ISSUER, "client_id": "hub",
+        "enabled": "on", "trust_email": "on"})
+    assert r.status_code == 303
+    owner.cookies.clear()
+    assert back(owner, go(owner, provider)).status_code == 303
+
+
+@pytest.mark.parametrize("address", ["http://id.example.com/token", "ftp://localhost/x"])
+def test_a_providers_address_leaving_this_machine_must_be_https(address):
+    with pytest.raises(oidc.OidcError):
+        oidc.check_endpoint(address)
+    oidc.check_endpoint("http://localhost:9000/token")
+
+
 def test_an_answer_signed_by_someone_else_is_refused(owner, provider):
     state = go(owner, provider)
     provider.sign_with = rsa.generate_private_key(public_exponent=65537, key_size=2048)

@@ -110,7 +110,9 @@ def test_changes_need_a_signed_in_browser(owner):
         assert stranger.post(path).status_code == 401, path
 
 
-def test_two_step_sign_in(owner, conn_, cfg):
+def test_two_step_sign_in(owner, conn_, cfg, monkeypatch):
+    now = time.time()
+    monkeypatch.setattr(auth.time, "time", lambda: now)  # a 30-second step can't pass mid-test
     assert owner.post("/settings/sign-in/two-step-start", data={"current": "wrong wrong wrong"}).status_code == 400
     page = owner.post("/settings/sign-in/two-step-start", data={"current": PASSWORD}).text
     secret = re.search(r"<code>([A-Z2-7]{32})</code>", page).group(1)

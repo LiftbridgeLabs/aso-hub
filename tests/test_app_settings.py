@@ -52,6 +52,14 @@ def test_another_encryption_key_asks_for_the_secret_again(cfg, hub, monkeypatch)
     assert "enter it again" in hub.get("/settings/alerts").text
 
 
+def test_a_file_standing_in_for_a_broken_secret_is_said(cfg, hub, tmp_path, monkeypatch):
+    post(hub, "/settings/alerts/webhook", name="discord-webhook", url=HOOK)
+    (tmp_path / "hook").write_text(HOOK)
+    monkeypatch.setenv("DISCORD_WEBHOOK_FILE", str(tmp_path / "hook"))
+    monkeypatch.setenv("SECRET_KEY", "a different key")
+    assert "Using the file on the server" in hub.get("/settings/alerts").text
+
+
 @pytest.mark.parametrize("data", [
     {"which": "asc", "key": "not a key"}, {"which": "play", "key": "{}"}, {"which": "play", "key": "nonsense"},
     {"which": "play", "play_bucket": "a bucket!"}, {"which": "asobeast", "asobeast_url": "file:///etc"}])
@@ -139,32 +147,36 @@ def test_a_webhook_test_sends_a_message(cfg, hub):
         web_settings.test_connection(cfg, "discord-webhook")
 
 
+def taken(conn, now):
+    return list(scheduler.due(conn, now))
+
+
 def at(text):
     return dt.datetime.fromisoformat(text).replace(tzinfo=dt.UTC)
 
 
 def test_the_schedule(cfg, conn):
-    assert scheduler.due(conn, at("2026-11-25 09:00")) == ["pull"]  # a new hub pulls straight away
-    assert scheduler.due(conn, at("2026-11-25 09:01")) == []
-    assert scheduler.due(conn, at("2026-11-25 13:00")) == ["pull"]
-    assert scheduler.due(conn, at("2026-11-29 12:00")) == ["pull"]  # missed times run once
-    assert scheduler.due(conn, at("2026-11-30 08:00")) == ["pull", "digest"]  # Monday
-    assert scheduler.due(conn, at("2026-11-30 08:00")) == []
+    assert taken(conn, at("2026-11-25 09:00")) == ["pull"]  # a new hub pulls straight away
+    assert taken(conn, at("2026-11-25 09:01")) == []
+    assert taken(conn, at("2026-11-25 13:00")) == ["pull"]
+    assert taken(conn, at("2026-11-29 12:00")) == ["pull"]  # missed times run once
+    assert taken(conn, at("2026-11-30 08:00")) == ["pull", "digest"]  # Monday
+    assert taken(conn, at("2026-11-30 08:00")) == []
 
 
 def test_the_schedule_follows_its_time_zone(cfg, conn):
     db.set_setting(conn, "schedule", {"timezone": "America/Denver", "pull_times": ["07:00"]})
-    scheduler.due(conn, at("2026-11-25 20:00"))
-    assert scheduler.due(conn, at("2026-11-26 13:59")) == []
-    assert scheduler.due(conn, at("2026-11-26 14:00")) == ["pull"]
+    taken(conn, at("2026-11-25 20:00"))
+    assert taken(conn, at("2026-11-26 13:59")) == []
+    assert taken(conn, at("2026-11-26 14:00")) == ["pull"]
 
 
 def test_saving_a_schedule_doesnt_run_a_time_already_past(cfg, hub, conn):
-    scheduler.due(conn, dt.datetime.now(dt.UTC))
+    taken(conn, dt.datetime.now(dt.UTC))
     past = (dt.datetime.now(dt.UTC) - dt.timedelta(minutes=2)).strftime("%H:%M")
     post(hub, "/settings/schedule/save", enabled="on", timezone="UTC", pull_times=past, digest_day="0",
          digest_time="08:00")
-    assert scheduler.due(conn, dt.datetime.now(dt.UTC)) == []
+    assert taken(conn, dt.datetime.now(dt.UTC)) == []
 
 
 @pytest.mark.parametrize("data", [{"timezone": "Mars/Base"}, {"pull_times": "25:00"}, {"pull_times": ""},
@@ -182,4 +194,18 @@ def test_one_job_runs_at_a_time(cfg, hub):
 
 def test_turned_off_nothing_is_due(cfg, conn):
     db.set_setting(conn, "schedule", {"enabled": False})
-    assert scheduler.due(conn, at("2026-11-30 09:00")) == []
+    assert taken(conn, at("2026-11-30 09:00")) == []
+
+
+def test_a_job_not_reached_before_a_restart_is_still_due(cfg, conn):
+    taken(conn, at("2026-11-25 09:00"))
+    started = next(scheduler.due(conn, at("2026-11-30 08:00")))  # the hub stops during this one
+    assert started == "pull" and taken(conn, at("2026-11-30 08:01")) == ["digest"]
+
+
+def test_a_hidden_apps_address_isnt_reused(cfg, hub):
+    post(hub, "/settings/apps/add", name="Twin", store="app_store", store_id="111111111")
+    post(hub, "/settings/apps/hide", slug="twin-ios")
+    post(hub, "/settings/apps/add", name="Twin", store="app_store", store_id="222222222")
+    post(hub, "/settings/apps/show", store_id="111111111")
+    assert {a.slug for a in now_settings(cfg).apps} >= {"twin-ios", "twin-2-ios"}

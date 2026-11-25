@@ -3,6 +3,7 @@ connected, the apps and rules.
 
 No key, token or webhook is ever returned: only whether each one is there.
 """
+import dataclasses
 import os
 import sqlite3
 from pathlib import Path
@@ -31,7 +32,11 @@ THRESHOLDS = {
 def secret_state(settings: Settings, name: str, path: Path | None) -> dict:
     """Whether one secret is there and where it comes from, without returning it."""
     if name in settings.broken_secrets:
-        return {"ok": False, "state": "Can't be opened: enter it again", "saved": True}
+        # A file on the server may be standing in: say what the hub is actually using.
+        stand_in = secret_state(dataclasses.replace(settings, broken_secrets=frozenset()), name, path)
+        state = ("Using the file on the server; the one saved in the hub can't be opened" if stand_in["ok"]
+                 else "Can't be opened: enter it again")
+        return {"ok": stand_in["ok"], "state": state, "saved": True}
     if path is not None and path.parent == STORED:
         return {"ok": True, "state": "Saved in the hub", "saved": True}
     try:

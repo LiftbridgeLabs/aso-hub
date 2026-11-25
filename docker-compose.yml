@@ -6,6 +6,8 @@
 # Open http://127.0.0.1:8690, create your account, and set up the rest under Settings.
 services:
   aso-hub:
+    # latest = the newest release. Set ASO_HUB_VERSION to dev for the newest code
+    # before it is released, or to a number such as 2.0.0 to stay on one.
     image: liftbridgelabs/aso-hub:${ASO_HUB_VERSION:-latest}
     container_name: aso-hub
     restart: unless-stopped
@@ -29,3 +31,4 @@ services:
 
 volumes:
   aso-hub-data:
+    name: aso-hub-data

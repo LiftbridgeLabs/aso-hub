@@ -21,6 +21,7 @@ SCOPES = "openid email profile"
 # Signed with the provider's private key only: never "none", never a shared-secret method.
 ALGORITHMS = ["RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA"]
 DISCOVERY = "/.well-known/openid-configuration"
+LOOPBACK = {"localhost", "127.0.0.1", "::1"}
 
 
 class OidcError(Exception):
@@ -36,9 +37,7 @@ def check_issuer_address(issuer: str) -> str:
     if issuer.endswith(DISCOVERY):
         issuer = issuer[: -len(DISCOVERY)]
     parts = urlsplit(issuer)
-    local = parts.hostname in {"localhost", "127.0.0.1", "::1"}
-    if not parts.hostname or parts.query or parts.fragment or not (
-            parts.scheme == "https" or (parts.scheme == "http" and local)):
+    if not parts.hostname or parts.query or parts.fragment or not _private_enough(issuer):
         raise OidcError("The issuer must be an https address, such as https://id.example.com.")
     return issuer
 
@@ -65,13 +64,19 @@ def discover(http: httpx.Client, issuer: str) -> dict:
     for key in ("authorization_endpoint", "token_endpoint", "jwks_uri"):
         if not found.get(key):
             raise OidcError(f"The provider's setup document has no {key}.")
-        check_endpoint(found[key], issuer)
+        check_endpoint(found[key])
     return found
 
 
-def check_endpoint(address: str, issuer: str) -> None:
-    """The provider's own addresses must be https too (http only for a local issuer)."""
-    if urlsplit(address).scheme != "https" and urlsplit(issuer).scheme != "http":
+def _private_enough(address: str) -> bool:
+    """https, or http that never leaves this machine."""
+    parts = urlsplit(address)
+    return parts.scheme == "https" or (parts.scheme == "http" and parts.hostname in LOOPBACK)
+
+
+def check_endpoint(address: str) -> None:
+    """The provider's own addresses are held to the same rule as the issuer's."""
+    if not _private_enough(address):
         raise OidcError("The provider points to an address that isn't https.")
 
 
@@ -182,17 +187,21 @@ def finish(conn: sqlite3.Connection, database: Path, state: sqlite3.Row, code: s
             raise OidcError("The provider sent no ID token.")
         keys = _json(http.get(found["jwks_uri"]), "its signing keys")
         claims = _verify(tokens["id_token"], keys, found["issuer"], row["client_id"], state["nonce"])
-        if not claims.get("email") and found.get("userinfo_endpoint") and tokens.get("access_token"):
-            check_endpoint(found["userinfo_endpoint"], row["issuer"])
+        incomplete = not claims.get("email") or "email_verified" not in claims
+        if incomplete and found.get("userinfo_endpoint") and tokens.get("access_token"):
+            check_endpoint(found["userinfo_endpoint"])
             info = _json(http.get(found["userinfo_endpoint"],
                                   headers={"Authorization": f"Bearer {tokens['access_token']}"}), "your details")
             if info.get("sub") != claims["sub"]:
                 raise OidcError("The provider's details belong to someone else.")
-            claims = claims | {k: info[k] for k in ("email", "email_verified") if k in info}
+            # A "verified" counts only for the address it came with.
+            if info.get("email") and claims.get("email") in (None, info["email"]):
+                claims = claims | {k: info[k] for k in ("email", "email_verified") if k in info}
     except httpx.HTTPError as e:
         raise OidcError(f"Couldn't reach the provider ({type(e).__name__}).") from None
     if not claims.get("email"):
         raise OidcError("The provider didn't share an email address.")
-    if claims.get("email_verified") in (False, "false"):
-        raise OidcError("The provider says that email address isn't verified.")
+    if claims.get("email_verified") not in (True, "true") and not row["trust_email"]:
+        raise OidcError("The provider didn't say that email address is verified. If you control the provider and "
+                        "trust its addresses, tick that for it under Settings → Sign-in.")
     return str(claims["email"])
