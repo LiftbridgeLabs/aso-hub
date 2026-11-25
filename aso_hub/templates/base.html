@@ -20,6 +20,7 @@
         <a href="/apps/{{ a.slug }}"{% if path == "/apps/" ~ a.slug %} aria-current="page"{% endif %}>{{ icon(a, details, "s") }}{{ a.label }}</a>
         {% endfor %}
         <a href="/actions"{% if path == "/actions" %} aria-current="page"{% endif %}>Actions{% if todo_count %} <span class="count" aria-label="{{ todo_count }} to do">{{ todo_count }}</span>{% endif %}</a>
+        <a href="/settings"{% if path == "/settings" %} aria-current="page"{% endif %}>Settings</a>
       </nav>
     </div>
   </header>
@@ -39,6 +40,7 @@
     <span class="{{ 'ok' if s.ok else 'bad' }}">{{ s.name }}:
       {% if s.last_ok_at %}updated {{ s.last_ok_at | short_date }}{% else %}not read yet{% endif %}</span>
     {% endfor %}
+    <a class="version" href="/settings">ASO Hub {{ version }}</a>
   </footer>
 </body>
 </html>

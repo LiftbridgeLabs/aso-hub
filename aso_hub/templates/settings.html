@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Settings · ASO Hub{% endblock %}
+{% block content %}
+<div class="head"><h1>Settings</h1></div>
+<p class="note">This page only shows how the hub is set up; nothing can be changed here, and keys are never shown.
+  Version {{ s.version }}.</p>
+
+<section class="panel">
+  <h2>Sign-in</h2>
+  {% for line in s.sign_ins %}<p>{{ line }}</p>{% else %}
+  <p>None. The hub only shows pages to addresses on its own machine. To open it from elsewhere, save a password
+    with <code>set-secret.sh hub-password</code>, or put a sign-in service in front.</p>
+  {% endfor %}
+  <p class="note">Answers to: {{ s.hosts | join(", ") }}</p>
+</section>
+
+{% for group in s.connections %}
+<section class="panel">
+  <h2>{{ group.name }}</h2>
+  <div class="scroll">
+  <table class="settings">
+    {% for i in group["items"] %}
+    <tr><td>{{ i.name }}</td>
+      <td><span class="chip {{ 'up' if i.ok else '' }}">{{ i.state }}</span></td>
+      <td>{% if not i.ok %}{{ i.how }}{% endif %}</td></tr>
+    {% endfor %}
+  </table>
+  </div>
+</section>
+{% endfor %}
+
+<section class="panel">
+  <h2>Apps</h2>
+  {% if apps %}
+  <div class="scroll">
+  <table class="settings">
+    <tr><th>App</th><th>Store id</th><th>Markets</th><th>Added by</th></tr>
+    {% for a in apps %}
+    <tr><td><a href="/apps/{{ a.slug }}">{{ a.label }}</a></td><td>{{ a.store_id }}</td>
+      <td>{{ a.markets | join(", ") | upper }}</td><td>{{ "AsoBeast" if a.auto else "config.toml" }}</td></tr>
+    {% endfor %}
+  </table>
+  </div>
+  {% else %}<p class="empty">No apps yet.</p>{% endif %}
+  <p class="note">Apps tracked in AsoBeast are {{ "added by themselves" if s.add_apps else "not added by themselves" }}.
+    {% if s.ignored %}Left out: {{ s.ignored | join(", ") }}.{% endif %}
+    To change apps, edit <code>{{ s.config_file }}</code>.</p>
+</section>
+
+<section class="panel">
+  <h2>Alert rules</h2>
+  <div class="scroll">
+  <table class="settings">
+    {% for r in s.rules %}
+    <tr><td>{{ r.name }}</td>
+      <td><span class="chip {{ 'up' if r.on else '' }}">{{ "On" if r.on else "Off" }}</span></td>
+      <td>{% for v in r["values"] %}{{ v }}{% if not loop.last %} · {% endif %}{% endfor %}</td></tr>
+    {% endfor %}
+  </table>
+  </div>
+  <p class="note">Weekly crash digest: {{ s.digest_apps | join(", ") or "no apps listed" }}.
+    To change rules or the digest, edit <code>{{ s.config_file }}</code>.</p>
+</section>
+{% endblock %}

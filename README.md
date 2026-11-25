@@ -99,8 +99,12 @@ old stylesheet.
   Center, with a link to AsoBeast to snooze or dismiss) and "Worth knowing"
   (nothing to do about it directly, like low downloads).
 
-Every page footer says when each source last updated, and a failed pull shows
-a banner with the reason.
+- **Settings**: view only. The version, which sign-in protects the hub, which
+  keys and webhooks it found (never their contents), your apps and where each
+  came from, and the alert rules.
+
+Every page footer shows the version and when each source last updated, and a
+failed pull shows a banner with the reason.
 
 ## Where the numbers come from
 
@@ -286,8 +290,9 @@ The pull and the weekly crash digest run on a schedule you set on the host.
 are systemd units that do it through `docker exec`; copy them to
 `/etc/systemd/system/`, set the times and your user, and enable the timers.
 
-To update, change `ASO_HUB_VERSION` in `.env` and run
-`docker compose pull && docker compose up -d`.
+To update, run `docker compose pull && docker compose up -d`. To stay on one
+release, set `ASO_HUB_VERSION` in `.env` to its number. The version you are on
+shows at the bottom of every page.
 
 ## Checks
 

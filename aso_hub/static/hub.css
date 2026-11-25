@@ -232,6 +232,10 @@ tr.auto td { color: var(--muted); font-weight: 400; }
   color: var(--muted); }
 .fresh span::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
   margin-right: 6px; vertical-align: 1px; background: var(--up); }
+.fresh .version { margin-left: auto; color: inherit; }
+table.settings td, table.settings th { text-align: left; }
+table.settings td:first-child { width: 28%; }
+table.settings td:last-child { white-space: normal; min-width: 160px; }
 .fresh .bad { color: var(--down); }
 .fresh .bad::before { background: var(--down); }
 

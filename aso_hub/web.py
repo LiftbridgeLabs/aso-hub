@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import asobeast, charts, db, discover, keywords, metrics, play, play_reports, settings
+from . import asobeast, charts, db, discover, keywords, metrics, play, play_reports, settings, status
 from .access import AccessCheck
 from .guard import Guard
 
@@ -37,6 +37,7 @@ def _asset(path: str) -> str:
 ASSETS = {name: _asset(name) for name in (
     "hub.css", "charts.js", "icon-32.png", "icon-64.png", "icon-180.png")}
 templates.env.globals["asset"] = ASSETS.__getitem__
+templates.env.globals["version"] = status.VERSION
 
 
 def num(n) -> str:
@@ -298,6 +299,14 @@ def actions_page(request: Request):
         cfg = discover.with_apps(cfg, conn)
         return _page(request, "actions.html", cfg, conn, actions=all_actions(conn, cfg),
                      asobeast_web=keywords.ASOBEAST_WEB)
+
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request):
+    cfg = _config()
+    with closing(_conn(cfg)) as conn:
+        cfg = discover.with_apps(cfg, conn)
+        return _page(request, "settings.html", cfg, conn, s=status.page(cfg))
 
 
 @app.get("/healthz")

@@ -45,6 +45,7 @@ jobs:
           docker run -d --name hub --read-only --tmpfs /tmp -p 127.0.0.1:8690:8690 "$IMAGE:$VERSION-${{ matrix.arch }}"
           curl --retry 15 --retry-delay 2 --retry-all-errors -fsS http://127.0.0.1:8690/healthz
           curl -fsS -o /dev/null http://127.0.0.1:8690/ || { docker logs hub; exit 1; }
+          curl -fsS http://127.0.0.1:8690/settings | grep -q "ASO Hub $VERSION" || { docker logs hub; exit 1; }
       - name: Push
         env:
           DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
