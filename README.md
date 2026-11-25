@@ -209,7 +209,8 @@ signed pass (`access.py`).
 
 ## Run it with Docker
 
-The image is published to Docker Hub for Intel/AMD and ARM machines. Put these
+The image is published to Docker Hub as
+[`liftbridgelabs/aso-hub`](https://hub.docker.com/r/liftbridgelabs/aso-hub) for Intel/AMD and ARM machines. Put these
 in one folder: [`deploy/compose.yaml`](deploy/compose.yaml),
 [`config.toml`](config.toml) (edit it for your apps),
 [`set-secret.sh`](set-secret.sh) (saves a secret without showing it), and
