@@ -59,6 +59,12 @@ def sales_row(app_id, kind, units, territory="US", device="iPhone"):
     return [row[h] for h in SALES_HEADER]
 
 
+@pytest.fixture(autouse=True)
+def test_host(monkeypatch):
+    # The test client calls the pages as "testserver".
+    monkeypatch.setenv("ASO_HUB_ALLOWED_HOSTS", "testserver")
+
+
 @pytest.fixture
 def conn(tmp_path):
     c = db.connect(tmp_path / "hub.db")
@@ -69,7 +75,7 @@ def conn(tmp_path):
 @pytest.fixture
 def cfg(tmp_path, monkeypatch):
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "hub.db"))
-    monkeypatch.setenv("HUB_CONFIG", str(ROOT / "config.toml"))
+    monkeypatch.setenv("HUB_CONFIG", str(ROOT / "demo" / "config.toml"))
     return settings.load()
 
 

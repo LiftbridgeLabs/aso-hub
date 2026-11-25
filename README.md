@@ -17,15 +17,51 @@ Shared as-is under the MIT license. Issues are welcome; there is no promise of
 support or a roadmap. It was built for one small team's apps, so expect rough
 edges outside that setup.
 
-The example `config.toml` uses made-up apps (Lumen, Kettle, Tandem, Atlas,
-Beacon); replace them with yours.
+**Setup is short:** every app you track in AsoBeast appears in the hub by
+itself, with the countries you track keywords in. You add your keys and run it.
 
 ![Overview page with sample data](docs/screenshot-overview.png)
 
 Screenshots show made-up numbers from `demo/seed.py`, which fills a throwaway
 database so you can look around without any keys:
 `python demo/seed.py /tmp/demo.db`, then
-`DATABASE_PATH=/tmp/demo.db python -m aso_hub serve`.
+`HUB_CONFIG=demo/config.toml DATABASE_PATH=/tmp/demo.db python -m aso_hub serve`.
+
+## Your apps
+
+Track an app in AsoBeast and it shows up after the next pull. Nothing else to
+edit. `config.toml` is for the rest:
+
+- an app AsoBeast doesn't track: add an `[[apps]]` block (the file shows how);
+- a different name, page address or markets: an `[[apps]]` block with the same
+  store id wins over AsoBeast;
+- an app you don't want shown, such as one that isn't yours: put its store id in
+  `ignore` under `[asobeast]`, or set `add_apps = false`.
+
+Store numbers need the app to be in your own App Store Connect or Play account.
+The weekly crash digest posts only the apps listed under `[crash_digest]`.
+
+## Security
+
+- **Your data stays with you.** There is no hosted service: the hub runs on your
+  machine and talks only to Apple, Google, your AsoBeast and your Discord
+  webhooks. Pages also load app icons from the stores.
+- **Read-only access.** Use an App Store Connect key with the Sales role, a Play
+  service account with view permissions and a read-only AsoBeast token. The hub
+  never changes a listing.
+- **No sign-in of its own.** The compose file listens on the local machine only.
+  Before opening it to others, put it behind a proxy or tunnel that makes people
+  sign in. Never publish the port straight to the internet.
+- **Known addresses only.** It answers to `localhost`, the host in `ASO_HUB_URL`
+  and any listed in `ASO_HUB_ALLOWED_HOSTS`, which stops other web pages from
+  reaching it through your browser (DNS rebinding).
+- **Locked-down container.** No root, read-only filesystem, no extra
+  capabilities; keys are read from files you mount read-only.
+- Keys sit unencrypted in `secrets/` and the database holds your sales figures:
+  protect the server and its backups as you would those.
+
+Found a security problem? Report it privately under the repository's
+**Security** tab, not in a public issue.
 
 ## Pages
 
@@ -122,7 +158,7 @@ at once, so a failed pull leaves the last good day. Apps are matched by store id
 
 ## Rules
 
-Thresholds live in `config.toml` . An action opens the first
+Thresholds live in `config.toml`. An action opens the first
 pull a rule fires, keeps its "since" date while it keeps firing, and resolves
 the first pull it doesn't.
 
@@ -215,7 +251,7 @@ signed pass (`access.py`).
 The image is published to Docker Hub as
 [`liftbridgelabs/aso-hub`](https://hub.docker.com/r/liftbridgelabs/aso-hub) for Intel/AMD and ARM machines. Put these
 in one folder: [`docker-compose.yml`](docker-compose.yml),
-[`config.toml`](config.toml) (edit it for your apps),
+[`config.toml`](config.toml) (usually fine as it is),
 [`set-secret.sh`](set-secret.sh) (saves a secret without showing it), and
 [`.env.example`](.env.example) saved as `.env` (or clone the repository, which
 has them all). Then:
@@ -225,7 +261,8 @@ mkdir -p data secrets && sudo chown 1001:1001 data
 docker compose up -d      # after adding secret files: sudo chown -R 1001:1001 secrets
 ```
 
-Open http://127.0.0.1:8690. Save secrets as files in `secrets/` (readable by user
+Open http://127.0.0.1:8690. If you open it at any other address, set
+`ASO_HUB_URL` in `.env` to that address. Save secrets as files in `secrets/` (readable by user
 1001), for example
 `ASO_HUB_SECRETS=./secrets bash set-secret.sh asobeast-token`
 (with `sudo` once `secrets/` belongs to user 1001, then run the `chown` again).

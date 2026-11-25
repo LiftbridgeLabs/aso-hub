@@ -24,8 +24,11 @@ class AccessCheck(BaseHTTPMiddleware):
                  jwks: jwt.PyJWKClient | None = None):
         super().__init__(app)
         self.audience = audience if audience is not None else os.environ.get("CF_ACCESS_AUD")
-        self.team_domain = team_domain
-        self.jwks = jwks or (jwt.PyJWKClient(f"{team_domain}/cdn-cgi/access/certs") if self.audience else None)
+        self.team_domain = team_domain.rstrip("/")
+        if self.audience and not self.team_domain and jwks is None:
+            raise RuntimeError("CF_ACCESS_AUD is set, so CF_ACCESS_TEAM_DOMAIN is needed too "
+                               "(https://yourteam.cloudflareaccess.com).")
+        self.jwks = jwks or (jwt.PyJWKClient(f"{self.team_domain}/cdn-cgi/access/certs") if self.audience else None)
 
     async def dispatch(self, request: Request, call_next):
         if not self.audience or request.url.path in OPEN_PATHS:

@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 
 import httpx
 
-from . import asc, db, notify, play
+from . import asc, db, discover, notify, play
 from .settings import App, Settings
 
 LIMIT = notify.LIMIT
@@ -185,6 +185,7 @@ def run(settings: Settings, conn: sqlite3.Connection, today: dt.date | None = No
         again: bool = False, asc_client: asc.Client | None = None, play_client: play.Client | None = None,
         transport: httpx.BaseTransport | None = None) -> bool:
     """Post this week's digests. Returns False if anything failed (and says so in #alerts)."""
+    settings = discover.with_apps(settings, conn)
     week = last_full_week(today or dt.date.today())
     wanted = settings.crash_digest.get("apps", [])
     top = int(settings.crash_digest.get("top_issues", 3))

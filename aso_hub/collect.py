@@ -9,13 +9,16 @@ import traceback
 
 import httpx
 
-from . import asc, asobeast, db, notify, play, rules
+from . import asc, asobeast, db, discover, notify, play, rules
 from .settings import Settings
 
-SOURCES = ("asc", "asobeast", "play")
+# AsoBeast first: it can add apps that the store pulls then read.
+SOURCES = ("asobeast", "asc", "play")
 
 
 def _pull_asc(settings: Settings, conn: sqlite3.Connection) -> str:
+    if not any(a.store == "app_store" for a in settings.apps):
+        return "no App Store apps to read"
     key = settings.read_secret(settings.asc_key_path)
     if not (settings.asc_issuer_id and settings.asc_key_id and key and settings.asc_vendor_number):
         raise asc.AscError("App Store Connect isn't set up "
@@ -47,6 +50,8 @@ def _pull_asobeast(settings: Settings, conn: sqlite3.Connection) -> str:
 
 
 def _pull_play(settings: Settings, conn: sqlite3.Connection) -> str:
+    if not any(a.store == "google_play" for a in settings.apps):
+        return "no Google Play apps to read"
     return play.pull(conn, settings)
 
 
@@ -59,7 +64,7 @@ def run(settings: Settings, conn: sqlite3.Connection, sources=SOURCES) -> bool:
     for source in sources:
         run_id = db.start_run(conn, source)
         try:
-            message = PULLS[source](settings, conn)
+            message = PULLS[source](discover.with_apps(settings, conn), conn)
             db.finish_run(conn, run_id, True, message)
             print(f"{source}: {message}")
         except KNOWN_ERRORS as e:
@@ -75,6 +80,7 @@ def run(settings: Settings, conn: sqlite3.Connection, sources=SOURCES) -> bool:
             all_ok = False
             db.finish_run(conn, run_id, False, f"Unexpected error: {type(e).__name__}. See the hub's log.")
             traceback.print_exc()
+    settings = discover.with_apps(settings, conn)
     rules.evaluate(settings, conn)
     all_ok = _notify(settings, conn) and all_ok
     return all_ok

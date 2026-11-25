@@ -10,8 +10,9 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import asobeast, charts, db, keywords, metrics, play, play_reports, settings
+from . import asobeast, charts, db, discover, keywords, metrics, play, play_reports, settings
 from .access import AccessCheck
+from .guard import Guard
 
 HERE = Path(__file__).resolve().parent
 SOURCE_NAMES = {"asc": "App Store Connect", "asobeast": "AsoBeast", "play": "Google Play"}
@@ -19,6 +20,7 @@ PRIORITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.add_middleware(AccessCheck)
+app.add_middleware(Guard)  # added last, so it runs first and its headers are on every answer
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
 templates.env.filters["short_date"] = metrics.short_date
@@ -246,6 +248,7 @@ def overview(request: Request, days: int = 7):
     cfg = _config()
     days = _period(days)
     with closing(_conn(cfg)) as conn:
+        cfg = discover.with_apps(cfg, conn)
         cards = []
         for a in cfg.apps:
             open_items = all_actions(conn, cfg, a.slug)
@@ -266,11 +269,12 @@ def overview(request: Request, days: int = 7):
 @app.get("/apps/{slug}", response_class=HTMLResponse)
 def app_page(request: Request, slug: str, days: int = 7, show_all: bool = Query(False, alias="all")):
     cfg = _config()
-    app_cfg = cfg.app(slug)
-    if app_cfg is None:
-        raise HTTPException(404)
     days = _period(days)
     with closing(_conn(cfg)) as conn:
+        cfg = discover.with_apps(cfg, conn)
+        app_cfg = cfg.app(slug)
+        if app_cfg is None:
+            raise HTTPException(404)
         tables = [t for t in (keywords.keyword_table(conn, app_cfg, cfg.keywords, c, show_all)
                               for c in app_cfg.markets) if t is not None]
         store = store_numbers(conn, app_cfg, days)
@@ -291,6 +295,7 @@ def app_page(request: Request, slug: str, days: int = 7, show_all: bool = Query(
 def actions_page(request: Request):
     cfg = _config()
     with closing(_conn(cfg)) as conn:
+        cfg = discover.with_apps(cfg, conn)
         return _page(request, "actions.html", cfg, conn, actions=all_actions(conn, cfg),
                      asobeast_web=keywords.ASOBEAST_WEB)
 

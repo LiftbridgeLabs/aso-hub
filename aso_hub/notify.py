@@ -13,7 +13,7 @@ import httpx
 from . import db, keywords
 from .settings import Settings
 
-HUB_URL = os.environ.get("ASO_HUB_URL", "http://localhost:8690").rstrip("/")
+HUB_URL = (os.environ.get("ASO_HUB_URL") or "http://localhost:8690").rstrip("/")
 WEBHOOK_PREFIXES = ("https://discord.com/api/webhooks/", "https://discordapp.com/api/webhooks/")
 LIMIT = 1900  # Discord allows 2000 characters
 DETAIL_CHARS = 220
@@ -93,6 +93,8 @@ def send(conn: sqlite3.Connection, settings: Settings, transport: httpx.BaseTran
 
 
 def _post(client: httpx.Client, url: str, text: str) -> None:
+    # Review and crash text comes from strangers: break "[words](address)" so it can't pose as a link.
+    text = text.replace("](", "] (")
     payload = {"content": text, "allowed_mentions": {"parse": []}, "flags": 4}  # 4: no link previews
     try:
         # wait=true: Discord answers only after the message is saved.

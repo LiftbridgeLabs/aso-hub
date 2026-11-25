@@ -141,3 +141,16 @@ def test_interval_is_the_last_30_days_on_whole_hours():
     p = play._interval(dt.datetime(2026, 10, 29, 3, 41, 12, tzinfo=dt.UTC), 30)
     assert (p["interval.startTime.month"], p["interval.startTime.day"], p["interval.startTime.hours"]) == (9, 29, 3)
     assert (p["interval.endTime.month"], p["interval.endTime.day"], p["interval.endTime.hours"]) == (10, 29, 3)
+
+
+def test_one_apps_refusal_doesnt_stop_the_others(cfg, conn, monkeypatch):
+    def issues(client, package):
+        if package == "com.example.lumen":
+            raise play.PlayError("not in this account")
+        return []
+
+    monkeypatch.setattr(play, "error_issues", issues)
+    settings = dataclasses.replace(cfg, play_bucket=None)
+    with pytest.raises(play.PlayError, match=r"Lumen \(Android\): not in this account"):
+        play.pull(conn, settings, object(), TODAY)
+    assert db.latest_snapshot(conn, "play_issues", "beacon-android")[0] == {"issues": []}

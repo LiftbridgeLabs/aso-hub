@@ -1,51 +1,32 @@
-# ASO Hub settings. The apps, markets and rule thresholds.
-# Change a number, then restart the hub (the next pull uses it). No secrets here:
-# keys and tokens live on the server.
+# ASO Hub settings: your apps, markets and rule thresholds. No secrets here.
+#
+# You may not need to change anything. Every app you track in AsoBeast shows up
+# by itself, with the countries you track keywords in. Edit this file to add an
+# app AsoBeast doesn't track, to rename one, or to tune the rules. A change
+# applies on the next pull or page load (restart the hub if it doesn't).
 
-# One entry per store listing. apple_id is the number in the App Store link;
-# google_package is the Play Store id. markets are two-letter store codes.
-[[apps]]
-slug = "lumen-ios"
-name = "Lumen"
-store = "app_store"
-apple_id = "1000000001"
-markets = ["us", "gb", "de"]
+[asobeast]
+add_apps = true
+# Store ids to leave out, for example ["1234567890", "com.example.oldapp"].
+ignore = []
 
-[[apps]]
-slug = "lumen-android"
-name = "Lumen"
-store = "google_play"
-google_package = "com.example.lumen"
-markets = ["us"]
-
-[[apps]]
-slug = "kettle-ios"
-name = "Kettle"
-store = "app_store"
-apple_id = "1000000002"
-markets = ["us"]
-
-[[apps]]
-slug = "tandem-ios"
-name = "Tandem"
-store = "app_store"
-apple_id = "1000000003"
-markets = ["us", "de"]   # a second market for this app
-
-[[apps]]
-slug = "atlas-ios"
-name = "Atlas"
-store = "app_store"
-apple_id = "1000000004"
-markets = ["us"]          # AsoBeast tracks US keywords only so far
-
-[[apps]]
-slug = "beacon-android"
-name = "Beacon"
-store = "google_play"
-google_package = "com.example.beacon"
-markets = ["us"]   # Example: iOS is TestFlight only, which Apple's
-                   # reports don't cover; add it at its App Store launch.
+# Your own entries, one per store listing; they win over what AsoBeast says.
+# apple_id is the number in the App Store link, google_package the Play Store id,
+# markets are two-letter store codes. Remove the # signs to use them.
+#
+# [[apps]]
+# slug = "myapp-ios"          # the page's address: /apps/myapp-ios
+# name = "My App"
+# store = "app_store"
+# apple_id = "1234567890"
+# markets = ["us", "gb"]
+#
+# [[apps]]
+# slug = "myapp-android"
+# name = "My App"
+# store = "google_play"
+# google_package = "com.example.myapp"
+# markets = ["us"]
 
 # Keywords to hide in the keyword tables. AsoBeast re-adds single words from
 # titles, subtitles and keyword fields on every daily check; hiding them here
@@ -53,8 +34,8 @@ markets = ["us"]   # Example: iOS is TestFlight only, which Apple's
 # under keep_single_words. "Show all" on the page still shows them.
 [keywords]
 hide_single_words = true
-# The server names Lumen's users search for.
-keep_single_words = ["audiobookshelf", "bookorbit", "grimmory", "atlas"]
+# Single words worth showing, such as your app's name.
+keep_single_words = []
 
 # Rules the hub checks on the store numbers. Each one adds an item to the
 # Actions list while it is true. Set enabled = false to turn a rule off.
@@ -64,7 +45,8 @@ keep_single_words = ["audiobookshelf", "bookorbit", "grimmory", "atlas"]
 [rules.low_downloads]
 enabled = true
 days = 7
-min_per_day = { "lumen-ios" = 3.0 }   # Lumen's normal is about 3.4 a day
+# An app is checked only if listed, for example { "myapp-ios" = 3.0 }.
+min_per_day = {}
 
 # Deletions are more than `max_rate` of first-time downloads over `days`.
 # Needs at least `min_downloads` downloads so one deletion out of one
@@ -110,9 +92,9 @@ many_users = 3
 # The weekly crash digest (Mondays, 8:00 AM server time): one message per app to
 # that app's own #alerts channel, with the last week's crashes and freezes
 # against the week before. Each listed app needs its #alerts webhook saved on
-# the server as alerts-<app> (alerts-lumen, alerts-tandem); a listed app
+# the server as alerts-<app> (alerts-myapp); a listed app
 # without one is reported as a failure in the alerts-admin channel. iOS and
 # Android of the same app share one message.
 [crash_digest]
-apps = ["Lumen", "Tandem", "Kettle", "Atlas", "Beacon"]
+apps = []   # app names, as shown on the pages
 top_issues = 3   # Android issues listed per week, most reports first

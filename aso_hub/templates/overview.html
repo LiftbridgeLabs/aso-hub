@@ -5,6 +5,13 @@
   <h1>Overview</h1>
   {% include "_periods.html" %}
 </div>
+{% if not cards %}
+<section class="panel">
+  <h2>No apps yet</h2>
+  <p>Track an app in AsoBeast, or add one to <code>config.toml</code>. It shows up after the next pull;
+    to pull now, run <code>docker exec aso-hub python -m aso_hub collect</code>.</p>
+</section>
+{% endif %}
 <div class="cards">
   {% for c in cards %}
   <section class="card">

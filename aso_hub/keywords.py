@@ -7,7 +7,7 @@ import sqlite3
 from . import asobeast, db
 from .settings import App, Settings
 
-ASOBEAST_WEB = os.environ.get("ASOBEAST_WEB_URL", "https://asobeast.example")
+ASOBEAST_WEB = os.environ.get("ASOBEAST_WEB_URL") or "https://asobeast.example"
 FIELD_NAMES = {"title": "Title", "subtitle": "Subtitle", "keywordField": "Keyword field",
                "description": "Description", "shortDescription": "Short description"}
 # AsoBeast's Action Center rules, in plain words.

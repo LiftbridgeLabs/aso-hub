@@ -18,9 +18,14 @@ class App:
     slug: str
     name: str
     store: str  # "app_store" or "google_play"
-    markets: list[str]
+    markets: list[str] = field(default_factory=lambda: ["us"])
     apple_id: str | None = None
     google_package: str | None = None
+    auto: bool = False  # picked up from AsoBeast, not listed in config.toml
+
+    @property
+    def store_id(self) -> str | None:
+        return self.apple_id if self.store == "app_store" else self.google_package
 
     @property
     def label(self) -> str:
@@ -51,6 +56,9 @@ class Settings:
     # The folder holding the #alerts webhooks: alerts-<app> per app (alerts-lumen)
     # and alerts-admin, the channel where failures go.
     alerts_webhook_dir: Path | None = None
+    # Whether apps tracked in AsoBeast join the list by themselves, and store ids to leave out.
+    add_apps: bool = True
+    ignore_apps: frozenset[str] = frozenset()
 
     def app(self, slug: str) -> App | None:
         return next((a for a in self.apps if a.slug == slug), None)
@@ -75,18 +83,21 @@ def load(config_path: Path | None = None) -> Settings:
     config_path = config_path or _path("HUB_CONFIG") or ROOT / "config.toml"
     with open(config_path, "rb") as f:
         config = tomllib.load(f)
-    apps = [App(**a) for a in config["apps"]]
+    apps = [App(**a) for a in config.get("apps", [])]
+    beast = config.get("asobeast", {})
     return Settings(
         apps=apps,
         rules=config.get("rules", {}),
         keywords=config.get("keywords", {}),
         crash_digest=config.get("crash_digest", {}),
+        add_apps=beast.get("add_apps", True),
+        ignore_apps=frozenset(str(i) for i in beast.get("ignore", [])),
         database_path=_path("DATABASE_PATH") or ROOT / "data" / "aso-hub.db",
         asc_issuer_id=os.environ.get("ASC_ISSUER_ID"),
         asc_key_id=os.environ.get("ASC_KEY_ID"),
         asc_key_path=_path("ASC_KEY_PATH"),
         asc_vendor_number=os.environ.get("ASC_VENDOR_NUMBER"),
-        asobeast_url=os.environ.get("ASOBEAST_URL", "http://asobeast-api:4000").rstrip("/"),
+        asobeast_url=(os.environ.get("ASOBEAST_URL") or "http://asobeast-api:4000").rstrip("/"),
         asobeast_token_file=_path("ASOBEAST_TOKEN_FILE"),
         discord_webhook_file=_path("DISCORD_WEBHOOK_FILE"),
         google_key_path=_path("GOOGLE_KEY_PATH"),

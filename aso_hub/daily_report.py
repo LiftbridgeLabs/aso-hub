@@ -6,7 +6,7 @@ comparison never mixes these with the older ASO Atlas snapshots.
 """
 import sqlite3
 
-from . import asobeast, db, metrics, play_reports
+from . import asobeast, db, discover, metrics, play_reports
 from .settings import App, Settings
 
 DAYS = 7
@@ -83,6 +83,7 @@ def _visibility(conn: sqlite3.Connection, cfg: Settings) -> tuple[dict, list]:
 
 
 def snapshot(conn: sqlite3.Connection, cfg: Settings) -> dict:
+    cfg = discover.with_apps(cfg, conn)
     end = metrics.latest_sales_day(conn)
     per_app, groups = _visibility(conn, cfg)
     apps = []

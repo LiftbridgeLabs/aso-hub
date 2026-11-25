@@ -172,8 +172,15 @@ def pull(conn: sqlite3.Connection, settings: Settings, client: Client | None = N
     client = client or client_for(settings)
     day = (today or dt.datetime.now(dt.UTC).date()).isoformat()
     apps = [a for a in settings.apps if a.store == "google_play"]
-    # Fetch everything first, then save it together: a failed pull saves nothing.
-    found = {a.slug: error_issues(client, a.google_package) for a in apps}
+    # One app's refusal (not in this Play account, say) doesn't stop the others.
+    found, failed = {}, []
+    for a in apps:
+        try:
+            found[a.slug] = error_issues(client, a.google_package)
+        except PlayError as e:
+            failed.append((a, e))
+    if failed and not found:
+        raise failed[0][1]  # every app refused: a key or permission problem, in its own words
     with conn:
         for slug, issues in found.items():
             db.save_snapshot(conn, day, "play_issues", slug, {"issues": issues})
@@ -183,6 +190,8 @@ def pull(conn: sqlite3.Connection, settings: Settings, client: Client | None = N
         from . import play_reports  # imports this module's Client
 
         message += "; " + play_reports.pull(conn, settings, client)
+    if failed:
+        raise PlayError("; ".join(f"{a.label}: {e}" for a, e in failed))
     return message
 
 

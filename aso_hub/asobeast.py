@@ -9,7 +9,7 @@ import sqlite3
 
 import httpx
 
-from . import db
+from . import db, discover
 from .settings import App, Settings
 
 STORES = {"app_store": "APP_STORE", "google_play": "GOOGLE_PLAY"}
@@ -37,20 +37,28 @@ class Client:
         return r.json()
 
 
-def store_id(app: App) -> str | None:
-    return app.apple_id if app.store == "app_store" else app.google_package
+def read_apps(client: Client) -> dict[str, dict]:
+    """AsoBeast app id -> its details, for the apps you track (competitors aren't listed)."""
+    return {item["id"]: client.get(f"/apps/{item['id']}") for item in client.get("/apps")}
 
 
-def match_apps(client: Client, apps: list[App]) -> dict[str, str]:
+def match_apps(details: dict[str, dict], apps: list[App]) -> dict[str, str]:
     """Hub app slug -> AsoBeast app id, matched by store and store id."""
-    wanted = {(STORES[a.store], store_id(a)): a.slug for a in apps}
+    wanted = {(STORES[a.store], a.store_id): a.slug for a in apps}
     found = {}
-    for item in client.get("/apps"):
-        detail = client.get(f"/apps/{item['id']}")
+    for aid, detail in details.items():
         slug = wanted.get((detail["store"], detail.get("storeAppId")))
         if slug:
-            found[slug] = item["id"]
+            found[slug] = aid
     return found
+
+
+def markets(client: Client, aid: str, home: str | None) -> list[str]:
+    """The countries an app tracks keywords in, its home storefront first."""
+    answer = client.get(f"/apps/{aid}/keyword-countries")
+    countries = [c["country"] for c in answer if isinstance(c, dict) and c.get("country")] if answer else []
+    countries.sort(key=lambda c: (c != home, c))
+    return countries or ([home] if home else [])
 
 
 def pull(conn: sqlite3.Connection, settings: Settings, client: Client | None = None,
@@ -61,11 +69,23 @@ def pull(conn: sqlite3.Connection, settings: Settings, client: Client | None = N
             raise AsoBeastError("The AsoBeast token isn't set up (ASOBEAST_TOKEN_FILE).")
         client = Client(settings.asobeast_url, token)
     today = today or dt.datetime.now(dt.UTC).date()  # AsoBeast's days are UTC dates
-    ids = match_apps(client, settings.apps)
+    details = read_apps(client)
+    configured = [a for a in settings.apps if not a.auto]
+    discovered = []
+    if settings.add_apps:
+        listed = {(STORES[a.store], a.store_id) for a in configured}
+        for aid, d in details.items():
+            if (d["store"], d.get("storeAppId")) not in listed:
+                details[aid] = d | {"markets": markets(client, aid, d.get("country"))}
+        previous, _ = db.latest_snapshot(conn, "discovered", "all")
+        discovered = discover.describe(list(details.values()), settings, (previous or {}).get("apps", []))
+    apps = configured + [App(**d, auto=True) for d in discovered]
+    ids = match_apps(details, apps)
 
     # Fetch everything, then save it in one go, so a failed pull leaves the last good day intact.
     snapshots: list[tuple[str, str, object]] = [
         ("ids", "all", ids), ("actions", "all", client.get("/actions")),
+        ("discovered", "all", {"apps": discovered}),
         # Visibility, audit score and their 7-day changes, per app and per linked group
         # (Lumen's Apple and Android listings), for the Monday post.
         ("portfolio", "all", client.get("/portfolio")),
@@ -73,7 +93,7 @@ def pull(conn: sqlite3.Connection, settings: Settings, client: Client | None = N
     ]
     rankings_from = (today - dt.timedelta(days=RANKING_DAYS)).isoformat()
     reviews_from = (today - dt.timedelta(days=REVIEW_DAYS)).isoformat()
-    for app in settings.apps:
+    for app in apps:
         aid = ids.get(app.slug)
         if not aid:
             continue
@@ -98,8 +118,10 @@ def pull(conn: sqlite3.Connection, settings: Settings, client: Client | None = N
     with conn:
         for kind, key, body in snapshots:
             db.save_snapshot(conn, today.isoformat(), kind, key, body)
-    missing = [a.label for a in settings.apps if a.slug not in ids]
+    missing = [a.label for a in configured if a.slug not in ids]
     message = f"read {len(ids)} apps"
+    if discovered:
+        message += f" ({len(discovered)} added from AsoBeast)"
     return message + (f"; not tracked in AsoBeast: {', '.join(missing)}" if missing else "")
 
 

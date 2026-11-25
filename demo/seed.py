@@ -1,9 +1,9 @@
 """Fill a throwaway database with made-up numbers, to look at the pages or take screenshots.
 
     python demo/seed.py /tmp/demo.db
-    DATABASE_PATH=/tmp/demo.db python -m aso_hub serve
+    HUB_CONFIG=demo/config.toml DATABASE_PATH=/tmp/demo.db python -m aso_hub serve
 
-Everything here is invented (the apps in config.toml are examples too). Run from the repo root.
+Everything here is invented (the apps in demo/config.toml are examples too). Run from the repo root.
 """
 import datetime as dt
 import math
@@ -112,13 +112,14 @@ def main() -> None:
         sys.exit(f"{path} already exists; pick a new name so nothing real is overwritten")
     import os
     os.environ["DATABASE_PATH"] = str(path)
+    os.environ.setdefault("HUB_CONFIG", str(Path(__file__).resolve().parent / "config.toml"))
     cfg = settings.load()
     conn = db.connect(path)
     seed_numbers(conn, cfg)
     seed_keywords(conn, cfg)
     rules.evaluate(cfg, conn)
     conn.close()
-    print(f"Wrote {path}. Run it with: DATABASE_PATH={path} python -m aso_hub serve")
+    print(f"Wrote {path}. Run it with: HUB_CONFIG=demo/config.toml DATABASE_PATH={path} python -m aso_hub serve")
 
 
 if __name__ == "__main__":
