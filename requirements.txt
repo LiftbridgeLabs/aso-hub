@@ -2,24 +2,24 @@
 # exactly what OSV-Scanner and pip-audit checked. Dependabot proposes updates as one grouped pull request.
 
 # Used directly
-fastapi==0.142.2
+fastapi==0.165.0
 uvicorn[standard]==0.54.0
 Jinja2==3.1.6
 httpx==0.28.1
 # httpx checks certificates against certifi's list. 2026.10.19 and later drop the eMudhra intermediates whose
 # private keys were found to be recoverable (disclosed 2026-10-20); pinned so no build picks up an older list.
-certifi==2026.10.23
+certifi==2026.11.20
 PyJWT==2.15.1
 cryptography==50.0.2
 # QR codes for setting up two-step sign-in.
 segno==1.6.6
 
 # Pulled in by the above
-annotated-doc==0.0.5
+annotated-doc==0.0.7
 annotated-types==0.8.0
-anyio==4.15.1
+anyio==4.16.0
 cffi==2.1.1
-click==8.5.0
+click==8.5.1
 h11==0.16.0
 httpcore==1.0.9
 httptools==0.9.0
@@ -27,13 +27,13 @@ idna==3.20
 MarkupSafe==3.0.4
 opentelemetry-api==1.45.2
 pycparser==3.12
-pydantic==2.14.1
-pydantic_core==2.50.1
+pydantic==2.14.4
+pydantic_core==2.50.5
 python-dotenv==1.2.4
-PyYAML==6.0.3
+PyYAML==6.0.4
 starlette==1.10.0
-typing-inspection==0.4.4
+typing-inspection==0.4.5
 typing_extensions==4.16.0
 uvloop==0.23.0
 watchfiles==1.3.0
-websockets==17.3
+websockets==17.4
