@@ -86,6 +86,9 @@ small { font-size: 0.8rem; }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text); }
 .brand:hover { text-decoration: none; }
 .mark { width: 22px; height: 22px; border-radius: 6px; background: url(/static/icon-64.png) center / cover, var(--accent); }
+.brandbar { display: flex; align-items: center; gap: 6px; }
+.gear { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; color: var(--muted); }
+.gear:hover, .gear[aria-current] { background: var(--surface-2); color: var(--text); }
 .top nav { display: flex; flex-wrap: wrap; gap: 4px; }
 .top nav a { display: flex; align-items: center; gap: 7px; padding: 5px 10px; border-radius: 8px; color: var(--muted);
   font-size: 0.9rem; font-weight: 500; }

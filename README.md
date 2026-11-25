@@ -99,7 +99,7 @@ old stylesheet.
   Center, with a link to AsoBeast to snooze or dismiss) and "Worth knowing"
   (nothing to do about it directly, like low downloads).
 
-- **Settings**: view only. The version, which sign-in protects the hub, which
+- **Settings** (the gear beside the name): view only. The version, which sign-in protects the hub, which
   keys and webhooks it found (never their contents), your apps and where each
   came from, and the alert rules.
 
