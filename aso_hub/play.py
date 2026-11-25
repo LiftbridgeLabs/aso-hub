@@ -56,6 +56,10 @@ class Client:
         self._tokens[scope] = (body["access_token"], now + body.get("expires_in", 3600))
         return body["access_token"]
 
+    def check(self) -> None:
+        """Prove the key works, by asking Google for a pass."""
+        self._token(REPORTING_SCOPE)
+
     def get(self, url: str, scope: str, params: dict | None = None) -> dict:
         return self._get(url, scope, params).json()
 

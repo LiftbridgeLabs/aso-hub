@@ -1,0 +1,8 @@
+{% extends "auth_base.html" %}
+{% block title %}Single sign-on{% endblock %}
+{% block content %}
+<h1>{{ "It worked" if email else "It didn't work" }}</h1>
+{% if email %}<p>The provider signed in <strong>{{ email }}</strong>.</p>
+<p>{{ "That address may sign in to this hub." if allowed else "That address isn't on the allowed list, so it can't sign in yet." }}</p>{% endif %}
+<p><a href="/settings/sign-in">Back to Settings</a></p>
+{% endblock %}

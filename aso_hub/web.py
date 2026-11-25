@@ -1,65 +1,63 @@
-"""The hub's pages. Read-only: they show what the last pull saved."""
-import datetime as dt
-import hashlib
+"""The hub's pages. The numbers are what the last pull saved; Settings changes how it runs."""
+import os
 import sqlite3
-from contextlib import closing
-from pathlib import Path
+import threading
+from contextlib import asynccontextmanager, closing
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
-from . import asobeast, charts, db, discover, keywords, metrics, play, play_reports, settings, status
+from . import (
+    asobeast,
+    auth,
+    charts,
+    db,
+    forms,
+    keywords,
+    metrics,
+    play,
+    play_reports,
+    scheduler,
+    settings,
+    status,
+    web_auth,
+    web_settings,
+)
 from .access import AccessCheck
-from .guard import Guard
+from .guard import Guard, SignedIn, cloudflare_access
+from .ui import HERE, all_actions, conn_and_config, money, num, page
 
-HERE = Path(__file__).resolve().parent
-SOURCE_NAMES = {"asc": "App Store Connect", "asobeast": "AsoBeast", "play": "Google Play"}
-PRIORITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 
-app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Under `serve`: say how to set up a new hub, and start the hub's clock."""
+    stop = threading.Event()
+    if os.environ.get("ASO_HUB_SERVING") == "1":
+        conn = db.connect(settings.load().database_path)
+        with closing(conn):
+            if not cloudflare_access() and not auth.import_password_file(conn) and auth.account(conn) is None:
+                print(f"ASO Hub: open the hub to create your account. Setup code: {auth.setup_code(conn)}",
+                      flush=True)
+        if os.environ.get("ASO_HUB_SCHEDULER", "").lower() != "off":
+            scheduler.start(stop)
+    yield
+    stop.set()
+
+
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+# Added innermost first: a request meets Guard, then Cloudflare Access, then the sign-in.
+app.add_middleware(SignedIn)
 app.add_middleware(AccessCheck)
-app.add_middleware(Guard)  # added last, so it runs first and its headers are on every answer
+app.add_middleware(Guard)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
-templates = Jinja2Templates(directory=HERE / "templates")
-templates.env.filters["short_date"] = metrics.short_date
-templates.env.filters["month"] = lambda ym: dt.date.fromisoformat(f"{ym}-01").strftime("%b %Y")
+app.include_router(web_auth.router)
+app.include_router(web_settings.router)
 
 
-def _asset(path: str) -> str:
-    """A static file's address with a fingerprint of its contents, so a browser
-    fetches the new copy after a deploy instead of a cached old one."""
-    digest = hashlib.sha256((HERE / "static" / path).read_bytes()).hexdigest()[:10]
-    return f"/static/{path}?v={digest}"
-
-
-ASSETS = {name: _asset(name) for name in (
-    "hub.css", "charts.js", "icon-32.png", "icon-64.png", "icon-180.png")}
-templates.env.globals["asset"] = ASSETS.__getitem__
-templates.env.globals["version"] = status.VERSION
-
-
-def num(n) -> str:
-    return "–" if n is None else f"{n:,.0f}"
-
-
-def money(n) -> str:
-    return "–" if n is None else f"${n:,.2f}"
-
-
-templates.env.filters["num"] = num
-templates.env.filters["money"] = money
-templates.env.filters["pct"] = lambda n: "–" if n is None else f"{n:.1%}"
-templates.env.filters["pos"] = lambda p: asobeast.position_label(p.get("position"), p.get("depth"))
-
-
-def _config() -> settings.Settings:
-    return settings.load()
-
-
-def _conn(cfg: settings.Settings) -> sqlite3.Connection:
-    return db.connect(cfg.database_path)
+@app.exception_handler(forms.TooLarge)
+def too_large(request: Request, error: forms.TooLarge):
+    return PlainTextResponse("That's too much to send.", status_code=413)
 
 
 def _ratio(part: float, whole: float) -> float | None:
@@ -188,56 +186,11 @@ def store_numbers(conn: sqlite3.Connection, app_cfg: settings.App, days: int = 7
     }
 
 
-def all_actions(conn: sqlite3.Connection, cfg: settings.Settings, app_slug: str | None = None) -> list[dict]:
-    """The hub's own open actions and AsoBeast's, most urgent first."""
-    sql = "SELECT * FROM hub_actions WHERE resolved_at IS NULL"
-    params: list = []
-    if app_slug:
-        sql += " AND app_slug = ?"
-        params.append(app_slug)
-    items = []
-    for row in conn.execute(sql, params):
-        app_cfg = cfg.app(row["app_slug"])
-        items.append(dict(row) | {"source": "hub", "app_label": app_cfg.label if app_cfg else row["app_slug"]})
-    items += keywords.asobeast_actions(conn, cfg, app_slug)
-    return sorted(items, key=lambda a: (PRIORITY_ORDER.get(a["priority"], 9), a["first_seen"]))
-
-
 def play_issues(conn: sqlite3.Connection, app_cfg: settings.App) -> list[dict]:
     """Google Play crash and ANR issues, most recent first."""
     body, _ = db.latest_snapshot(conn, "play_issues", app_cfg.slug)
     issues = [i | {"label": play.issue_label(i)} for i in (body or {}).get("issues", [])]
     return sorted(issues, key=lambda i: i.get("lastErrorReportTime", ""), reverse=True)
-
-
-def freshness(conn: sqlite3.Connection) -> list[dict]:
-    runs = db.last_runs(conn)
-    out = []
-    for source, name in SOURCE_NAMES.items():
-        info = runs.get(source, {"last": None, "last_ok_at": None})
-        last = info["last"]
-        out.append({"name": name, "ok": bool(last and last["ok"]), "never": last is None,
-                    "last_ok_at": info["last_ok_at"], "message": last["message"] if last else ""})
-    return out
-
-
-def app_details(conn: sqlite3.Connection, apps: list[settings.App]) -> dict[str, dict]:
-    """Icon and version per app, from AsoBeast's latest look at each store listing."""
-    out = {}
-    for a in apps:
-        body, _ = db.latest_snapshot(conn, "app", a.slug)
-        body = body or {}
-        icon = body.get("iconUrl") or ""
-        out[a.slug] = {"icon": icon if icon.startswith("https://") else None,
-                       "version": (body.get("latestSnapshot") or {}).get("version")}
-    return out
-
-
-def _page(request: Request, name: str, cfg: settings.Settings, conn: sqlite3.Connection, **context):
-    todo = sum(1 for a in all_actions(conn, cfg) if a["kind"] == "do")
-    return templates.TemplateResponse(request, name, {
-        "apps": cfg.apps, "sources": freshness(conn), "periods": metrics.PERIODS,
-        "details": app_details(conn, cfg.apps), "todo_count": todo, "path": request.url.path, **context})
 
 
 def _period(days: int) -> int:
@@ -246,10 +199,9 @@ def _period(days: int) -> int:
 
 @app.get("/", response_class=HTMLResponse)
 def overview(request: Request, days: int = 7):
-    cfg = _config()
+    cfg, conn = conn_and_config()
     days = _period(days)
-    with closing(_conn(cfg)) as conn:
-        cfg = discover.with_apps(cfg, conn)
+    with closing(conn):
         cards = []
         for a in cfg.apps:
             open_items = all_actions(conn, cfg, a.slug)
@@ -264,15 +216,14 @@ def overview(request: Request, days: int = 7):
                           "moves": [m for m in asobeast.moves(conn, a, cfg.keywords, market) if m["change"]][:4],
                           "todo": sum(1 for x in open_items if x["kind"] == "do"),
                           "fyi": sum(1 for x in open_items if x["kind"] == "fyi")})
-        return _page(request, "overview.html", cfg, conn, cards=cards, days=days)
+        return page(request, "overview.html", cfg, conn, cards=cards, days=days)
 
 
 @app.get("/apps/{slug}", response_class=HTMLResponse)
 def app_page(request: Request, slug: str, days: int = 7, show_all: bool = Query(False, alias="all")):
-    cfg = _config()
+    cfg, conn = conn_and_config()
     days = _period(days)
-    with closing(_conn(cfg)) as conn:
-        cfg = discover.with_apps(cfg, conn)
+    with closing(conn):
         app_cfg = cfg.app(slug)
         if app_cfg is None:
             raise HTTPException(404)
@@ -287,31 +238,31 @@ def app_page(request: Request, slug: str, days: int = 7, show_all: bool = Query(
         else:
             trend = []
         crashes = play_issues(conn, app_cfg) if app_cfg.store == "google_play" else None
-        return _page(request, "app.html", cfg, conn, app=app_cfg, store=store, play=gp, charts=trend, crashes=crashes,
+        return page(request, "app.html", cfg, conn, app=app_cfg, store=store, play=gp, charts=trend, crashes=crashes,
                      actions=all_actions(conn, cfg, slug), days=days, tables=tables, show_all=show_all,
-                     ratings=keywords.ratings(conn, app_cfg), asobeast_web=keywords.ASOBEAST_WEB)
+                     ratings=keywords.ratings(conn, app_cfg), asobeast_web=cfg.asobeast_web_url)
 
 
 @app.get("/actions", response_class=HTMLResponse)
 def actions_page(request: Request):
-    cfg = _config()
-    with closing(_conn(cfg)) as conn:
-        cfg = discover.with_apps(cfg, conn)
-        return _page(request, "actions.html", cfg, conn, actions=all_actions(conn, cfg),
-                     asobeast_web=keywords.ASOBEAST_WEB)
+    cfg, conn = conn_and_config()
+    with closing(conn):
+        return page(request, "actions.html", cfg, conn, actions=all_actions(conn, cfg),
+                     asobeast_web=cfg.asobeast_web_url)
 
 
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request):
-    cfg = _config()
-    with closing(_conn(cfg)) as conn:
-        cfg = discover.with_apps(cfg, conn)
-        return _page(request, "settings.html", cfg, conn, s=status.page(cfg))
+    cfg, conn = conn_and_config()
+    with closing(conn):
+        plan = scheduler.schedule(conn)
+        return page(request, "settings/overview.html", cfg, conn, sign_ins=status.sign_ins(conn),
+                    connections=status.sources(cfg), plan=plan, days=scheduler.DAYS, version=status.VERSION)
 
 
 @app.get("/healthz")
 def healthz():
-    cfg = _config()
-    with closing(_conn(cfg)) as conn:
+    conn = db.connect(settings.load().database_path)
+    with closing(conn):
         conn.execute("SELECT 1")
     return JSONResponse({"ok": True})

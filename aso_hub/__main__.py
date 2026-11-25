@@ -1,4 +1,6 @@
-"""python -m aso_hub serve | collect [asc|asobeast ...] | report-snapshot | crash-digest [--dry-run] [--again]"""
+"""python -m aso_hub serve | collect [asc|asobeast ...] | report-snapshot | crash-digest [--dry-run] [--again]
+| reset-password | turn-off-two-step"""
+import getpass
 import os
 import sys
 
@@ -36,11 +38,35 @@ def main(argv: list[str]) -> int:
     if command == "serve":
         import uvicorn
 
+        os.environ["ASO_HUB_SERVING"] = "1"
         uvicorn.run("aso_hub.web:app", host=os.environ.get("HOST", "127.0.0.1"),
                     port=int(os.environ.get("PORT", "8690")), proxy_headers=False)
         return 0
+    if command in ("reset-password", "turn-off-two-step"):
+        return account_command(cfg, command)
     print(__doc__, file=sys.stderr)
     return 2
+
+
+def account_command(cfg: settings.Settings, command: str) -> int:
+    """For whoever runs the server: when the password or the phone is lost."""
+    from . import auth
+
+    conn = db.connect(cfg.database_path)
+    if command == "turn-off-two-step":
+        auth.turn_off_two_step(conn)
+        auth.end_other_sessions(conn, None)
+        print("Two-step sign-in is off, and every browser is signed out.")
+        return 0
+    try:
+        password = getpass.getpass("New password: ")
+        auth.check_new_password(password, getpass.getpass("Again: "))
+        auth.set_password(conn, password)
+    except (auth.AuthError, EOFError) as e:
+        print(str(e) or "no password typed", file=sys.stderr)
+        return 1
+    print("Password saved, and every browser is signed out.")
+    return 0
 
 
 if __name__ == "__main__":

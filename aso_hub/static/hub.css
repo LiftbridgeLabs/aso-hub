@@ -251,3 +251,39 @@ table.settings td:last-child { white-space: normal; min-width: 160px; }
   .top nav { flex-wrap: nowrap; overflow-x: auto; width: 100%; scrollbar-width: none; }
   .top nav a { white-space: nowrap; }
 }
+
+/* Settings and sign-in forms */
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 16px; }
+.tabs a { padding: 6px 12px; border-radius: 8px; color: var(--muted); font-size: 0.9rem; font-weight: 500; }
+.tabs a:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
+.tabs a[aria-current] { background: var(--surface-2); color: var(--text); }
+.section-title { margin-top: 0; }
+.banner.good { background: var(--up-soft); color: var(--up); margin: 0 0 16px; }
+.banner.bad { background: var(--down-soft); color: var(--down); margin: 0 0 16px; }
+form { margin: 0; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; font-weight: 500; }
+label.check { flex-direction: row; align-items: center; gap: 8px; }
+input[type=text], input[type=password], input[type=url], input[type=number], input[type=time], select, textarea {
+  font: inherit; font-size: 0.9rem; font-weight: 400; color: var(--text); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; max-width: 100%; }
+textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; }
+fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 0; min-width: 0; }
+legend { padding: 0 4px; }
+.fields-form { display: flex; flex-direction: column; gap: 12px; max-width: 560px; margin: 12px 0; }
+.fields-form > button { align-self: flex-start; }
+.inline-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin: 8px 0; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 8px 0 0; }
+button, a.button { font: inherit; font-size: 0.88rem; font-weight: 600; cursor: pointer; border-radius: 8px;
+  padding: 7px 14px; border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent); }
+button.quiet, a.button.quiet { background: var(--surface); color: var(--text); border-color: var(--line); }
+button.quiet:hover { background: var(--surface-2); }
+button.danger { color: var(--down); }
+a.button { display: block; text-align: center; }
+.webhook { padding: 12px 0; border-top: 1px solid var(--line); }
+.webhook .inline-form input { width: min(340px, 70vw); }
+.qr svg { max-width: 100%; height: auto; border-radius: 8px; }
+.codes { columns: 2; max-width: 320px; padding-left: 18px; }
+code { overflow-wrap: anywhere; }
+.sign-in { max-width: 400px; padding-top: 48px; }
+.sign-in .brand { justify-content: center; margin: 0 0 20px; font-size: 1.2rem; }
+.sign-in h1 { font-size: 1.2rem; margin-top: 0; }

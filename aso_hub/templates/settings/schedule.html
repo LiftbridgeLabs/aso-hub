@@ -1,0 +1,30 @@
+{% extends "settings/_base.html" %}
+{% block heading %}Schedule{% endblock %}
+{% block settings %}
+<section class="panel">
+  <form method="post" action="/settings/schedule/save" class="fields-form">
+    <label class="check"><input type="checkbox" name="enabled"{% if plan.enabled %} checked{% endif %}>
+      Run on the hub's own schedule</label>
+    <label>Time zone <select name="timezone">{% for z in zones %}<option{% if z == plan.timezone %} selected{% endif %}>{{ z }}</option>{% endfor %}</select></label>
+    <label>Pull times, 24-hour <input type="text" name="pull_times" value="{{ plan.pull_times | join(', ') }}" required></label>
+    <label>Crash digest day <select name="digest_day">{% for d in days %}<option value="{{ loop.index0 }}"{% if loop.index0 == plan.digest_day %} selected{% endif %}>{{ d }}</option>{% endfor %}</select></label>
+    <label>Crash digest time <input type="time" name="digest_time" value="{{ plan.digest_time }}" required></label>
+    <button>Save schedule</button>
+  </form>
+</section>
+<section class="panel">
+  <h2>Next and last runs</h2>
+  <table class="settings">
+    {% for job, name, source in [("pull", "Data pull", "asc"), ("digest", "Crash digest", "crash_digest")] %}
+    <tr><td>{{ name }}</td>
+      <td>{% if plan.enabled and upcoming.get(job) %}Next: {{ upcoming[job] }}{% else %}Not scheduled{% endif %}</td>
+      <td>{% set last = runs.get(source, {}).get("last") %}{% if last %}Last: {{ last.finished_at | short_date }}, {{ "ok" if last.ok else "failed" }}{% else %}Never run{% endif %}</td></tr>
+    {% endfor %}
+  </table>
+  {% if running %}<p>Something is running now. Reload to see when it finishes.</p>{% endif %}
+  <div class="row">
+    <form method="post" action="/settings/schedule/pull"><button class="quiet">Pull now</button></form>
+    <form method="post" action="/settings/schedule/digest"><button class="quiet">Send the crash digest now</button></form>
+  </div>
+</section>
+{% endblock %}

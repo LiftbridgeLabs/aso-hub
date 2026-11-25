@@ -1,38 +1,39 @@
-"""Who the hub answers, whatever sits in front of it.
+"""Who the hub answers.
 
 - Only addresses it knows. Without that, a web page you visit could point its own
   domain name at your hub's local address and read it (DNS rebinding).
-- With a password saved, only requests that carry it.
-- Opened at an address other than this machine's, only with a sign-in: the hub's
-  password, Cloudflare Access, or another sign-in service you declare.
+- Changes only from the hub's own pages, so another website can't submit one
+  through your browser.
+- Pages only to someone signed in: with the account, a single sign-on, or
+  Cloudflare Access.
 - Each page tells the browser to run only the hub's own scripts and never to show
   the hub inside another site.
 """
-import base64
-import hmac
 import os
-import time
-from pathlib import Path
 from urllib.parse import urlsplit
 
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse
+from starlette.responses import PlainTextResponse, RedirectResponse
+
+from . import auth, db, settings
 
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 # The container's own health check; it shows nothing.
 OPEN_PATHS = {"/healthz"}
-MIN_PASSWORD = 12
-# After this many wrong passwords from one address, it waits out the window.
-MAX_FAILURES, WINDOW = 10, 300
-FAILURES: dict[str, list[float]] = {}  # address -> when it got the password wrong
+# What someone not signed in yet has to reach: the sign-in pages and their styles.
+SIGN_IN_PATHS = ("/static/", "/setup", "/login", "/auth/oidc/")
+SESSION_COOKIE = "aso_hub_session"
+READS = {"GET", "HEAD", "OPTIONS"}
 HEADERS = {
     # Images may come from the stores (app icons); everything else only from the hub.
     "Content-Security-Policy": ("default-src 'self'; img-src 'self' https: data:; object-src 'none'; "
                                 "base-uri 'none'; form-action 'self'; frame-ancestors 'none'"),
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
-    "Referrer-Policy": "no-referrer",
+    # Not "no-referrer": that would hide where the hub's own forms come from.
+    "Referrer-Policy": "same-origin",
 }
 
 
@@ -46,38 +47,27 @@ def allowed_hosts() -> set[str]:
     return hosts | {h.strip().lower() for h in extra.split(",") if h.strip()}
 
 
-def password() -> str | None:
-    """The saved password, read each time so a new one applies at once. A file that
-    exists but can't be read raises, so a permissions mistake never opens the hub."""
-    name = os.environ.get("HUB_PASSWORD_FILE")
-    if not name:
-        return None
-    try:
-        return Path(name).read_text().strip() or None
-    except FileNotFoundError:
-        return None
+def cloudflare_access() -> bool:
+    return bool(os.environ.get("CF_ACCESS_AUD"))
 
 
-def signs_in_elsewhere() -> bool:
-    declared = os.environ.get("ASO_HUB_BEHIND_SIGN_IN", "").strip().lower() in {"1", "true", "yes"}
-    return declared or bool(os.environ.get("CF_ACCESS_AUD"))
-
-
-def _given_password(header: str) -> str | None:
-    """The password in a browser's Basic sign-in; the user name can be anything."""
-    kind, _, value = header.partition(" ")
-    if kind.lower() != "basic":
-        return None
-    try:
-        return base64.b64decode(value.strip(), validate=True).decode().partition(":")[2]
-    except ValueError:
-        return None
+def from_own_pages(request: Request) -> bool:
+    """Whether the browser says this request comes from one of the hub's own pages."""
+    site = request.headers.get("sec-fetch-site")
+    if site:  # sent over https and on localhost, and a page can't forge it
+        return site in {"same-origin", "none"}
+    origin = urlsplit(request.headers.get("origin", ""))
+    return bool(origin.netloc) and origin.netloc == request.headers.get("host")
 
 
 class Guard(BaseHTTPMiddleware):
+    """Outermost: the address, where changes come from, and the browser protections."""
+
     async def dispatch(self, request: Request, call_next):
         response = self._refusal(request) or await call_next(request)
         response.headers.update(HEADERS)
+        if not request.url.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-store"
         return response
 
     def _refusal(self, request: Request) -> PlainTextResponse | None:
@@ -90,35 +80,36 @@ class Guard(BaseHTTPMiddleware):
             return PlainTextResponse(
                 "The hub doesn't answer to this address. Set ASO_HUB_URL to the address you open it at, "
                 "or list it in ASO_HUB_ALLOWED_HOSTS.", status_code=400)
-        if request.url.path in OPEN_PATHS:
-            return None
-        secret = password()
-        if secret is None:
-            # Judged on the settings, not the request, so a made-up "localhost" doesn't get past.
-            if allowed - LOCAL_HOSTS and not signs_in_elsewhere():
-                return PlainTextResponse(
-                    "This hub is set up to be opened from other machines, so it needs a sign-in. Save a password "
-                    "as the hub-password secret, or, if a proxy already signs people in, set "
-                    "ASO_HUB_BEHIND_SIGN_IN=true.", status_code=503)
-            return None
-        if len(secret) < MIN_PASSWORD:
-            return PlainTextResponse(
-                f"The saved password is shorter than {MIN_PASSWORD} characters. Save a longer one.", status_code=503)
-        return self._check(request, secret)
+        if request.method not in READS and not from_own_pages(request):
+            return PlainTextResponse("That change didn't come from the hub's own pages.", status_code=403)
+        return None
 
-    def _check(self, request: Request, secret: str) -> PlainTextResponse | None:
-        who = request.client.host if request.client else "?"
-        now = time.monotonic()
-        recent = [t for t in FAILURES.get(who, []) if now - t < WINDOW]
-        if len(recent) >= MAX_FAILURES:
-            return PlainTextResponse("Too many wrong passwords. Try again in a few minutes.", status_code=429)
-        given = _given_password(request.headers.get("authorization", ""))
-        if given is not None and hmac.compare_digest(given.encode(), secret.encode()):
-            FAILURES.pop(who, None)
-            return None
-        if given is not None:  # a first visit with no password yet isn't a wrong guess
-            if len(FAILURES) > 1000:
-                FAILURES.clear()
-            FAILURES[who] = [*recent, now]
-        return PlainTextResponse("Enter the hub's password.", status_code=401,
-                                 headers={"WWW-Authenticate": 'Basic realm="ASO Hub", charset="UTF-8"'})
+
+def _signed_in(token: str | None) -> tuple[bool, bool]:
+    """(signed in, an account exists)"""
+    conn = db.connect(settings.load().database_path)
+    try:
+        if auth.account(conn) is None:
+            auth.import_password_file(conn)
+        return auth.session_ok(conn, token), auth.account(conn) is not None
+    finally:
+        conn.close()
+
+
+class SignedIn(BaseHTTPMiddleware):
+    """Innermost, so Cloudflare Access, when set up, has already checked its own pass."""
+
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if path in OPEN_PATHS or path.startswith("/static/"):
+            return await call_next(request)
+        if cloudflare_access():
+            request.state.signed_in = True
+            return await call_next(request)
+        signed, exists = await run_in_threadpool(_signed_in, request.cookies.get(SESSION_COOKIE))
+        request.state.signed_in = signed
+        if signed or path.startswith(SIGN_IN_PATHS):
+            return await call_next(request)
+        if request.method not in READS:
+            return PlainTextResponse("Sign in first.", status_code=401)
+        return RedirectResponse("/login" if exists else "/setup", status_code=303)

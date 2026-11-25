@@ -63,7 +63,13 @@ def sales_row(app_id, kind, units, territory="US", device="iPhone"):
 def test_host(monkeypatch):
     # The test client calls the pages as "testserver".
     monkeypatch.setenv("ASO_HUB_ALLOWED_HOSTS", "testserver")
-    monkeypatch.setenv("ASO_HUB_BEHIND_SIGN_IN", "true")
+
+
+@pytest.fixture(autouse=True)
+def signed_in(request, monkeypatch):
+    """Page tests are about the pages: they're signed in, unless marked `real_sign_in`."""
+    if "real_sign_in" not in request.keywords:
+        monkeypatch.setattr("aso_hub.guard._signed_in", lambda token: (True, True))
 
 
 @pytest.fixture

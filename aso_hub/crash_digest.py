@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 
 import httpx
 
-from . import asc, db, discover, notify, play
+from . import asc, db, notify, overlay, play
 from .settings import App, Settings
 
 LIMIT = notify.LIMIT
@@ -185,7 +185,7 @@ def run(settings: Settings, conn: sqlite3.Connection, today: dt.date | None = No
         again: bool = False, asc_client: asc.Client | None = None, play_client: play.Client | None = None,
         transport: httpx.BaseTransport | None = None) -> bool:
     """Post this week's digests. Returns False if anything failed (and says so in #alerts)."""
-    settings = discover.with_apps(settings, conn)
+    settings = overlay.effective(settings, conn)
     week = last_full_week(today or dt.date.today())
     wanted = settings.crash_digest.get("apps", [])
     top = int(settings.crash_digest.get("top_issues", 3))
@@ -206,7 +206,7 @@ def run(settings: Settings, conn: sqlite3.Connection, today: dt.date | None = No
                 if not dry_run and not url:
                     path = settings.alerts_webhook_file(name)
                     raise DigestError(f"no #alerts webhook saved ({path.name})" if path
-                                      else "ALERTS_WEBHOOK_DIR isn't set")
+                                      else "no #alerts webhook saved (add it under Settings → Alerts)")
                 sections = []
                 for app in (a for a in settings.apps if a.name == name):
                     if app.store == "app_store":

@@ -156,6 +156,62 @@ CREATE TABLE IF NOT EXISTS crash_digests (
     sent_at TEXT NOT NULL,
     PRIMARY KEY (app, week_start)
 );
+
+-- What was set up in the app (see overlay.py). It wins over config.toml, the
+-- environment and the secret files. Values are JSON.
+CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+-- Keys, tokens and webhooks saved in the app, encrypted (see crypto.py).
+CREATE TABLE IF NOT EXISTS app_secrets (
+    name TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- The owner's account: one row.
+CREATE TABLE IF NOT EXISTS account (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    password_hash TEXT NOT NULL,
+    totp_secret TEXT,                       -- encrypted
+    totp_on INTEGER NOT NULL DEFAULT 0,
+    totp_step INTEGER NOT NULL DEFAULT 0,   -- the last code used, so none works twice
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS recovery_codes (
+    hash TEXT PRIMARY KEY,
+    used_at TEXT
+);
+
+-- Signed-in browsers. Only a fingerprint of each cookie is kept. `pending` is a
+-- right password still waiting for its two-step code.
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash TEXT PRIMARY KEY,
+    pending INTEGER NOT NULL DEFAULT 0,
+    expires REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sign_in_providers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    issuer TEXT NOT NULL,
+    client_id TEXT NOT NULL,
+    client_secret TEXT NOT NULL,            -- encrypted
+    enabled INTEGER NOT NULL DEFAULT 1
+);
+
+-- Single sign-ons on their way to the provider and back; each state works once.
+CREATE TABLE IF NOT EXISTS oidc_states (
+    state TEXT PRIMARY KEY,
+    provider_id INTEGER NOT NULL,
+    nonce TEXT NOT NULL,
+    verifier TEXT NOT NULL,
+    trying INTEGER NOT NULL DEFAULT 0,
+    expires REAL NOT NULL
+);
 """
 
 
@@ -182,6 +238,20 @@ def _add_columns(conn: sqlite3.Connection) -> None:
             if column not in have:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")  # noqa: S608 (fixed names)
     conn.commit()
+
+
+def get_setting(conn: sqlite3.Connection, key: str, default=None):
+    row = conn.execute("SELECT value FROM app_settings WHERE key = ?", (key,)).fetchone()
+    return json.loads(row["value"]) if row else default
+
+
+def set_setting(conn: sqlite3.Connection, key: str, value) -> None:
+    """Save one in-app setting; None removes it, so the file or default applies again."""
+    with conn:
+        if value is None:
+            conn.execute("DELETE FROM app_settings WHERE key = ?", (key,))
+        else:
+            conn.execute("INSERT OR REPLACE INTO app_settings VALUES (?, ?)", (key, json.dumps(value)))
 
 
 def start_run(conn: sqlite3.Connection, source: str) -> int:

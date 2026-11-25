@@ -1,13 +1,11 @@
 """What the pages show from AsoBeast: keyword tables, listing coverage, ratings,
 reviews and AsoBeast's own actions. Reads the saved snapshots only."""
-import os
 import re
 import sqlite3
 
 from . import asobeast, db
 from .settings import App, Settings
 
-ASOBEAST_WEB = os.environ.get("ASOBEAST_WEB_URL") or "https://asobeast.example"
 FIELD_NAMES = {"title": "Title", "subtitle": "Subtitle", "keywordField": "Keyword field",
                "description": "Description", "shortDescription": "Short description"}
 # AsoBeast's Action Center rules, in plain words.
@@ -147,6 +145,6 @@ def asobeast_actions(conn: sqlite3.Connection, settings: Settings, app_slug: str
                     "title": ACTION_TITLES.get(item["rule"], item["rule"]), "detail": _action_detail(item),
                     "first_seen": item.get("firstSeenAt", ""), "app_slug": slug,
                     "app_label": app.label if app else (item.get("scope") or {}).get("appName", ""),
-                    "snoozed": item.get("status") == "SNOOZED", "link": ASOBEAST_WEB,
+                    "snoozed": item.get("status") == "SNOOZED", "link": settings.asobeast_web_url,
                     "id": item.get("id", ""), "reopen_count": item.get("reopenCount", 0)})
     return out

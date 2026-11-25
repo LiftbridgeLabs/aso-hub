@@ -1,0 +1,11 @@
+{% extends "auth_base.html" %}
+{% block title %}Two-step sign-in{% endblock %}
+{% block content %}
+<h1>Enter your code</h1>
+<form method="post" action="/login/code" class="fields-form">
+  <label>The code from your authenticator app, or a recovery code
+    <input type="text" name="code" autocomplete="one-time-code" required autofocus></label>
+  <button>Continue</button>
+</form>
+<p><a href="/login">Start again</a></p>
+{% endblock %}

@@ -1,0 +1,89 @@
+{% extends "settings/_base.html" %}
+{% from "settings/_macros.html" import confirm, chip %}
+{% block heading %}Sign-in{% endblock %}
+{% block settings %}
+{% if access %}<section class="panel"><p>Cloudflare Access signs people in before they reach the hub. The settings below
+  apply if Cloudflare Access is ever turned off.</p></section>{% endif %}
+
+{% if codes %}
+<section class="panel">
+  <h2>Your recovery codes</h2>
+  <p>Save these now; they aren't shown again. Each signs you in once if you lose your phone.</p>
+  <ul class="codes">{% for c in codes %}<li><code>{{ c }}</code></li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+<section class="panel">
+  <h2>{{ "Change password" if account else "Create a password" }}</h2>
+  <form method="post" action="/settings/sign-in/password" class="fields-form">
+    {{ confirm(account) }}
+    <label>New password, at least 12 characters <input type="password" name="password" autocomplete="new-password" minlength="12" required></label>
+    <label>Again <input type="password" name="again" autocomplete="new-password" minlength="12" required></label>
+    <button>Save password</button>
+  </form>
+</section>
+
+{% if account %}
+<section class="panel">
+  <div class="panel-head"><h2>Two-step sign-in</h2>{{ chip(two_step, "On" if two_step else "Off") }}</div>
+  {% if setup %}
+  <p>Scan this with an authenticator app (1Password, Google Authenticator, the iPhone's Passwords app), or type the key.</p>
+  <div class="qr">{{ setup.qr | safe }}</div>
+  <p><code>{{ setup.secret }}</code></p>
+  <form method="post" action="/settings/sign-in/two-step-confirm" class="fields-form">
+    <label>The 6-digit code it shows <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" required></label>
+    <button>Turn on</button>
+  </form>
+  {% elif two_step %}
+  <form method="post" action="/settings/sign-in/two-step-codes" class="fields-form">
+    {{ confirm(account) }}<button class="quiet">Make new recovery codes</button></form>
+  <form method="post" action="/settings/sign-in/two-step-off" class="fields-form">
+    {{ confirm(account) }}<button class="quiet danger">Turn off two-step sign-in</button></form>
+  {% else %}
+  <form method="post" action="/settings/sign-in/two-step-start" class="fields-form">
+    {{ confirm(account) }}<button>Set up two-step sign-in</button></form>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="panel">
+  <h2>Single sign-on (OpenID Connect)</h2>
+  <p>Create a client at your provider (Pocket ID, Authentik, Authelia, Google and others) with this redirect address:<br>
+    <code>{{ callback }}</code></p>
+  <form method="post" action="/settings/sign-in/allowed" class="fields-form">
+    <label>Who may sign in this way: email addresses, or @domain for everyone at it
+      <textarea name="allowed" rows="3">{{ allowed | join("\n") }}</textarea></label>
+    {{ confirm(account) }}
+    <button class="quiet">Save allowed list</button>
+  </form>
+  {% if providers and not allowed %}<p class="down">Nobody is on the allowed list yet, so single sign-on lets nobody in.</p>{% endif %}
+</section>
+
+{% for p in providers + [none] %}
+<section class="panel">
+  <div class="panel-head"><h2>{{ p.name if p else "Add a provider" }}</h2>
+    {% if p %}{{ chip(p.enabled, "On" if p.enabled else "Off") }}{% endif %}</div>
+  <form method="post" action="/settings/sign-in/provider" class="fields-form">
+    <input type="hidden" name="id" value="{{ p.id if p else '' }}">
+    <label>Button name <input type="text" name="name" value="{{ p.name if p else '' }}" maxlength="60" required></label>
+    <label>Issuer address <input type="url" name="issuer" value="{{ p.issuer if p else '' }}" placeholder="https://id.example.com" required></label>
+    <label>Client ID <input type="text" name="client_id" value="{{ p.client_id if p else '' }}" autocomplete="off" required></label>
+    <label>Client secret <input type="password" name="client_secret" autocomplete="off" placeholder="{{ 'Leave empty to keep what is saved' if p else '' }}"{% if not p %} required{% endif %}></label>
+    <label class="check"><input type="checkbox" name="enabled"{% if not p or p.enabled %} checked{% endif %}> Show on the sign-in page</label>
+    {{ confirm(account) }}
+    <button{% if p %} class="quiet"{% endif %}>Save provider</button>
+  </form>
+  {% if p %}
+  <p><a href="/auth/oidc/{{ p.id }}?test=true" target="_blank" rel="noopener">Try it</a> (a real sign-in in a new tab; you stay signed in)</p>
+  <form method="post" action="/settings/sign-in/provider-remove" class="fields-form">
+    <input type="hidden" name="id" value="{{ p.id }}">{{ confirm(account) }}<button class="quiet danger">Remove provider</button></form>
+  {% endif %}
+</section>
+{% endfor %}
+
+{% if account and not access %}
+<form method="post" action="/logout"><button class="quiet">Sign out</button></form>
+{% endif %}
+<p class="note">The hub answers to: {{ hosts | join(", ") }}. Locked out? On the server:
+  <code>docker exec -it aso-hub python -m aso_hub reset-password</code></p>
+{% endblock %}

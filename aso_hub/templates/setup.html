@@ -1,0 +1,12 @@
+{% extends "auth_base.html" %}
+{% block title %}Set up{% endblock %}
+{% block content %}
+<h1>Create your account</h1>
+<p>The setup code is printed in the hub's log: run <code>docker logs aso-hub</code>.</p>
+<form method="post" action="/setup" class="fields-form">
+  <label>Setup code <input type="text" name="code" autocomplete="off" spellcheck="false" required autofocus></label>
+  <label>Password, at least 12 characters <input type="password" name="password" autocomplete="new-password" minlength="12" required></label>
+  <label>Password again <input type="password" name="again" autocomplete="new-password" minlength="12" required></label>
+  <button>Create account</button>
+</form>
+{% endblock %}

@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+# Stands in for a folder: a secret "file" here is one saved in the app (see overlay.py).
+STORED = Path("/saved-in-the-hub")
 
 
 @dataclass(frozen=True)
@@ -22,6 +24,7 @@ class App:
     apple_id: str | None = None
     google_package: str | None = None
     auto: bool = False  # picked up from AsoBeast, not listed in config.toml
+    saved: bool = False  # listed in the app's Settings
 
     @property
     def store_id(self) -> str | None:
@@ -59,17 +62,32 @@ class Settings:
     # Whether apps tracked in AsoBeast join the list by themselves, and store ids to leave out.
     add_apps: bool = True
     ignore_apps: frozenset[str] = frozenset()
+    asobeast_web_url: str = "https://asobeast.example"  # for links to AsoBeast
+    hub_url: str = "http://localhost:8690"  # for links to the hub
+    # Secrets saved in the app, and ones saved with a key the hub no longer has.
+    stored_secrets: dict = field(default_factory=dict, repr=False)
+    broken_secrets: frozenset[str] = frozenset()
 
     def app(self, slug: str) -> App | None:
         return next((a for a in self.apps if a.slug == slug), None)
 
+    @staticmethod
+    def webhook_slug(name: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+
     def alerts_webhook_file(self, name: str) -> Path | None:
         """The webhook file for an app's #alerts ("Lumen" -> alerts-lumen), or "admin"."""
-        slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+        slug = self.webhook_slug(name)
+        if f"alerts-{slug}" in self.stored_secrets:
+            return STORED / f"alerts-{slug}"
         return self.alerts_webhook_dir / f"alerts-{slug}" if self.alerts_webhook_dir else None
 
     def read_secret(self, path: Path | None) -> str | None:
-        if path is None or not path.exists():
+        if path is None:
+            return None
+        if path.parent == STORED:
+            return self.stored_secrets.get(path.name)
+        if not path.exists():
             return None
         return path.read_text().strip() or None
 
@@ -103,4 +121,6 @@ def load(config_path: Path | None = None) -> Settings:
         google_key_path=_path("GOOGLE_KEY_PATH"),
         play_bucket=os.environ.get("PLAY_BUCKET"),
         alerts_webhook_dir=_path("ALERTS_WEBHOOK_DIR"),
+        asobeast_web_url=os.environ.get("ASOBEAST_WEB_URL") or "https://asobeast.example",
+        hub_url=(os.environ.get("ASO_HUB_URL") or "http://localhost:8690").rstrip("/"),
     )

@@ -1,0 +1,52 @@
+{% extends "settings/_base.html" %}
+{% from "settings/_macros.html" import chip, keyfile, actions %}
+{% macro idfield(name, label, value, help="") -%}
+<label>{{ label }}
+  <input type="text" name="{{ name }}" value="{{ ids.get(name, '') }}" autocomplete="off" spellcheck="false"
+    placeholder="{{ 'Set outside the hub; type to replace' if value and not ids.get(name) else help }}"></label>
+{% if ids.get(name) %}<label class="check"><input type="checkbox" name="clear_{{ name }}"> Remove the saved {{ label | lower }} (when left empty)</label>{% endif %}
+{%- endmacro %}
+{% block heading %}Connections{% endblock %}
+{% block settings %}
+<p class="note">Keys and tokens are encrypted when saved and never shown again. Use read-only keys.</p>
+
+<section class="panel">
+  <div class="panel-head"><h2>App Store Connect</h2>{{ chip(state["asc-key.p8"].ok, "Key: " ~ state["asc-key.p8"].state) }}</div>
+  <p class="note">In App Store Connect: Users and Access → Integrations → create a key with the Sales role.</p>
+  <form method="post" action="/settings/connections/save" class="fields-form">
+    <input type="hidden" name="which" value="asc">
+    {{ idfield("asc_issuer_id", "Issuer id", hub.asc_issuer_id) }}
+    {{ idfield("asc_key_id", "Key id", hub.asc_key_id) }}
+    {{ idfield("asc_vendor_number", "Vendor number", hub.asc_vendor_number, "Under Payments and Financial Reports") }}
+    {{ keyfile("asc-key", "key", "Key file (.p8)", ".p8,.pem,.txt") }}
+    <button>Save App Store Connect</button>
+  </form>
+  {{ actions("connections", "asc-key.p8", state["asc-key.p8"], "asc") }}
+</section>
+
+<section class="panel">
+  <div class="panel-head"><h2>Google Play</h2>{{ chip(state["google-play.json"].ok, "Key: " ~ state["google-play.json"].state) }}</div>
+  <p class="note">A Google Cloud service account, added in Play Console with permission to view app information and financial data.</p>
+  <form method="post" action="/settings/connections/save" class="fields-form">
+    <input type="hidden" name="which" value="play">
+    {{ idfield("play_bucket", "Reports bucket", hub.play_bucket, "pubsite_prod_…, under Download reports") }}
+    {{ keyfile("google-key", "key", "Service account key (.json)", ".json") }}
+    <button>Save Google Play</button>
+  </form>
+  {{ actions("connections", "google-play.json", state["google-play.json"], "play") }}
+</section>
+
+<section class="panel">
+  <div class="panel-head"><h2>AsoBeast</h2>{{ chip(state["asobeast-token"].ok, "Token: " ~ state["asobeast-token"].state) }}</div>
+  <form method="post" action="/settings/connections/save" class="fields-form">
+    <input type="hidden" name="which" value="asobeast">
+    {{ idfield("asobeast_url", "Address the hub reads", hub.asobeast_url, "http://asobeast-api:4000") }}
+    {{ idfield("asobeast_web_url", "Address you open in the browser", hub.asobeast_web_url, "For links to AsoBeast") }}
+    <label>Read-only token
+      <input type="password" name="token" autocomplete="off" placeholder="Leave empty to keep what's saved"></label>
+    <button>Save AsoBeast</button>
+  </form>
+  {{ actions("connections", "asobeast-token", state["asobeast-token"], "asobeast") }}
+</section>
+<p class="note">Discord webhooks are under <a href="/settings/alerts">Alerts</a>.</p>
+{% endblock %}

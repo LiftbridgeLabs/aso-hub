@@ -9,7 +9,7 @@ import traceback
 
 import httpx
 
-from . import asc, asobeast, db, discover, notify, play, rules
+from . import asc, asobeast, db, notify, overlay, play, rules
 from .settings import Settings
 
 # AsoBeast first: it can add apps that the store pulls then read.
@@ -64,7 +64,7 @@ def run(settings: Settings, conn: sqlite3.Connection, sources=SOURCES) -> bool:
     for source in sources:
         run_id = db.start_run(conn, source)
         try:
-            message = PULLS[source](discover.with_apps(settings, conn), conn)
+            message = PULLS[source](overlay.effective(settings, conn), conn)
             db.finish_run(conn, run_id, True, message)
             print(f"{source}: {message}")
         except KNOWN_ERRORS as e:
@@ -80,7 +80,7 @@ def run(settings: Settings, conn: sqlite3.Connection, sources=SOURCES) -> bool:
             all_ok = False
             db.finish_run(conn, run_id, False, f"Unexpected error: {type(e).__name__}. See the hub's log.")
             traceback.print_exc()
-    settings = discover.with_apps(settings, conn)
+    settings = overlay.effective(settings, conn)
     rules.evaluate(settings, conn)
     all_ok = _notify(settings, conn) and all_ok
     return all_ok

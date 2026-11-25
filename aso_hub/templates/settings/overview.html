@@ -1,0 +1,25 @@
+{% extends "settings/_base.html" %}
+{% from "settings/_macros.html" import chip %}
+{% block heading %}Overview{% endblock %}
+{% block settings %}
+<section class="panel">
+  <h2>Sign-in</h2>
+  {% for line in sign_ins %}<p>{{ line }}</p>{% endfor %}
+  <p><a href="/settings/sign-in">Change sign-in</a></p>
+</section>
+<section class="panel">
+  <h2>Connections</h2>
+  <table class="settings">
+    {% for c in connections %}<tr><td>{{ c.name }}</td><td>{{ chip(c.ok, c.state) }}</td></tr>{% endfor %}
+  </table>
+  <p><a href="/settings/connections">Set up connections</a></p>
+</section>
+<section class="panel">
+  <h2>Schedule</h2>
+  {% if plan.enabled %}<p>Pulls at {{ plan.pull_times | join(", ") }} and posts the crash digest on
+    {{ days[plan.digest_day] }}s at {{ plan.digest_time }} ({{ plan.timezone }}).</p>
+  {% else %}<p>The hub's own schedule is off.</p>{% endif %}
+  <p><a href="/settings/schedule">Change the schedule</a></p>
+</section>
+<p class="note">ASO Hub {{ version }}</p>
+{% endblock %}

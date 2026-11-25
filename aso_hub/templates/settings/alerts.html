@@ -1,0 +1,68 @@
+{% extends "settings/_base.html" %}
+{% from "settings/_macros.html" import chip, actions %}
+{% block heading %}Alerts{% endblock %}
+{% block settings %}
+<section class="panel">
+  <h2>Discord webhooks</h2>
+  <p class="note">In Discord: the channel's settings → Integrations → Webhooks → New Webhook → Copy Webhook URL.</p>
+  {% for w in webhooks %}
+  <div class="webhook">
+    <div class="panel-head"><strong>{{ w.label }}</strong>{{ chip(w.ok, w.state) }}</div>
+    <form method="post" action="/settings/alerts/webhook" class="inline-form">
+      <input type="hidden" name="name" value="{{ w.name }}">
+      <label>Webhook address <input type="password" name="url" autocomplete="off" placeholder="Paste to save or replace"></label>
+      <button class="quiet">Save</button>
+    </form>
+    {{ actions("alerts", w.name, w) }}
+  </div>
+  {% endfor %}
+</section>
+
+<section class="panel">
+  <h2>Rules</h2>
+  <form method="post" action="/settings/alerts/rules" class="fields-form">
+    {% for key, rule in rules.items() %}
+    <fieldset>
+      <legend><label class="check"><input type="checkbox" name="{{ key }}.enabled"{% if rule.enabled %} checked{% endif %}>
+        {{ rule_names.get(key, key) }}</label></legend>
+      <div class="inline-form">
+      {% for name, value in rule.items() if name != "enabled" %}
+        {% if value is mapping %}
+          {% for a in hub.apps if a.store == "app_store" %}
+          <label>{{ thresholds.get(name, name) }}, {{ a.name }}
+            <input type="number" step="any" min="0" name="{{ key }}.{{ name }}.{{ a.slug }}" value="{{ value.get(a.slug, '') }}" placeholder="not checked"></label>
+          {% endfor %}
+        {% else %}
+          <label>{{ thresholds.get(name, name) }}
+            <input type="number" step="any" min="0" name="{{ key }}.{{ name }}" value="{{ value }}" required></label>
+        {% endif %}
+      {% endfor %}
+      </div>
+    </fieldset>
+    {% endfor %}
+    <button>Save rules</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Weekly crash digest</h2>
+  <form method="post" action="/settings/alerts/digest" class="fields-form">
+    {% for n in names %}
+    <label class="check"><input type="checkbox" name="apps" value="{{ n }}"{% if n in hub.crash_digest.get("apps", []) %} checked{% endif %}> {{ n }}</label>
+    {% else %}<p class="empty">No apps yet.</p>{% endfor %}
+    <label>Android issues listed per week <input type="number" min="0" max="10" name="top_issues" value="{{ hub.crash_digest.get('top_issues', 3) }}"></label>
+    <button>Save digest</button>
+  </form>
+  <p class="note">Each chosen app needs its webhook above.</p>
+</section>
+
+<section class="panel">
+  <h2>Keyword tables</h2>
+  <form method="post" action="/settings/alerts/keywords" class="fields-form">
+    <label class="check"><input type="checkbox" name="hide"{% if hub.keywords.get("hide_single_words") %} checked{% endif %}>
+      Hide single words AsoBeast adds from listings</label>
+    <label>Words to show anyway <input type="text" name="keep" value="{{ hub.keywords.get('keep_single_words', []) | join(', ') }}"></label>
+    <button>Save</button>
+  </form>
+</section>
+{% endblock %}

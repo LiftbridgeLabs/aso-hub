@@ -1,0 +1,25 @@
+{# The password again, for changes to who can get in. #}
+{% macro confirm(account) -%}
+{% if account %}<label>Your current password
+  <input type="password" name="current" autocomplete="current-password" required></label>{% endif %}
+{%- endmacro %}
+
+{% macro chip(ok, text) -%}<span class="chip {{ 'up' if ok else '' }}">{{ text }}</span>{%- endmacro %}
+
+{# A key file: choose it, or paste its text. #}
+{% macro keyfile(id, name, label, accept) -%}
+<label>{{ label }}
+  <input type="file" accept="{{ accept }}" data-into="{{ id }}">
+  <textarea id="{{ id }}" name="{{ name }}" rows="4" spellcheck="false" autocomplete="off"
+    placeholder="Choose the file above, or paste its text. Leave empty to keep what's saved."></textarea></label>
+{%- endmacro %}
+
+{# Test or remove a saved secret. #}
+{% macro actions(section, name, state, what=none) -%}
+<div class="row">
+  {% if state.ok %}<form method="post" action="/settings/{{ section }}/test">
+    <input type="hidden" name="what" value="{{ what or name }}"><button class="quiet">Test</button></form>{% endif %}
+  {% if state.saved %}<form method="post" action="/settings/{{ section }}/remove">
+    <input type="hidden" name="name" value="{{ name }}"><button class="quiet danger">Remove</button></form>{% endif %}
+</div>
+{%- endmacro %}

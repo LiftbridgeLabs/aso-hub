@@ -1,0 +1,52 @@
+{% extends "settings/_base.html" %}
+{% block heading %}Apps{% endblock %}
+{% block settings %}
+<section class="panel">
+  <form method="post" action="/settings/apps/auto" class="row">
+    <label class="check"><input type="checkbox" name="add_apps"{% if add_apps %} checked{% endif %}>
+      Add every app tracked in AsoBeast by itself</label>
+    <button class="quiet">Save</button>
+  </form>
+</section>
+
+{% for a in apps %}
+<section class="panel">
+  <div class="panel-head"><h2>{{ a.label }}</h2>
+    <small>{{ a.store_id }} · from {{ "this page" if a.slug in mine else "AsoBeast" if a.auto else "config.toml" }}</small></div>
+  <form method="post" action="/settings/apps/edit" class="inline-form">
+    <input type="hidden" name="slug" value="{{ a.slug }}">
+    <label>Name <input type="text" name="name" value="{{ a.name }}" maxlength="60" required></label>
+    <label>Markets <input type="text" name="markets" value="{{ a.markets | join(', ') }}" required></label>
+    <button class="quiet">Save</button>
+  </form>
+  <div class="row">
+    <form method="post" action="/settings/apps/hide"><input type="hidden" name="slug" value="{{ a.slug }}">
+      <button class="quiet">Hide</button></form>
+    {% if a.slug in mine %}<form method="post" action="/settings/apps/reset"><input type="hidden" name="slug" value="{{ a.slug }}">
+      <button class="quiet danger">Undo this page's changes</button></form>{% endif %}
+  </div>
+</section>
+{% else %}<section class="panel"><p class="empty">No apps yet. Connect AsoBeast, or add one below.</p></section>
+{% endfor %}
+
+<section class="panel">
+  <h2>Add an app</h2>
+  <form method="post" action="/settings/apps/add" class="fields-form">
+    <label>Name <input type="text" name="name" maxlength="60" required></label>
+    <label>Store <select name="store"><option value="app_store">App Store</option><option value="google_play">Google Play</option></select></label>
+    <label>App Store number or Google Play package <input type="text" name="store_id" required spellcheck="false"></label>
+    <label>Markets <input type="text" name="markets" value="us"></label>
+    <button>Add app</button>
+  </form>
+</section>
+
+{% if hidden %}
+<section class="panel">
+  <h2>Hidden</h2>
+  {% for sid in hidden %}
+  <form method="post" action="/settings/apps/show" class="row">
+    <input type="hidden" name="store_id" value="{{ sid }}"><code>{{ sid }}</code><button class="quiet">Show again</button></form>
+  {% endfor %}
+</section>
+{% endif %}
+{% endblock %}

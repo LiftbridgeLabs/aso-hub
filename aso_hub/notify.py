@@ -5,7 +5,6 @@ AsoBeast items stay quiet. Each item posts once: when it opens, and again only
 if it resolves and comes back. The webhook URL is a credential, so it is never
 printed, not even in an error.
 """
-import os
 import sqlite3
 
 import httpx
@@ -13,7 +12,6 @@ import httpx
 from . import db, keywords
 from .settings import Settings
 
-HUB_URL = (os.environ.get("ASO_HUB_URL") or "http://localhost:8690").rstrip("/")
 WEBHOOK_PREFIXES = ("https://discord.com/api/webhooks/", "https://discordapp.com/api/webhooks/")
 LIMIT = 1900  # Discord allows 2000 characters
 DETAIL_CHARS = 220
@@ -49,16 +47,16 @@ def _line(item: dict) -> str:
     return line + (f"\n  <{item['link']}>" if item.get("link") else "")
 
 
-def message(items: list[dict]) -> str:
+def message(items: list[dict], hub_url: str = "http://localhost:8690") -> str:
     noun = "to-do" if len(items) == 1 else "to-dos"
-    return "\n".join([f"**ASO Hub: {len(items)} new {noun}**", *map(_line, items), f"<{HUB_URL}/actions>"])
+    return "\n".join([f"**ASO Hub: {len(items)} new {noun}**", *map(_line, items), f"<{hub_url}/actions>"])
 
 
-def batches(items: list[dict]) -> list[list[dict]]:
+def batches(items: list[dict], hub_url: str = "http://localhost:8690") -> list[list[dict]]:
     """Split the to-dos into messages that each fit Discord's limit, keeping their order."""
     out: list[list[dict]] = []
     for item in items:
-        if out and len(message(out[-1] + [item])) <= LIMIT:
+        if out and len(message(out[-1] + [item], hub_url)) <= LIMIT:
             out[-1].append(item)
         else:
             out.append([item])
@@ -82,8 +80,8 @@ def send(conn: sqlite3.Connection, settings: Settings, transport: httpx.BaseTran
         return "no new to-dos"
     posted = 0
     with httpx.Client(transport=transport, timeout=20, headers={"User-Agent": "aso-hub"}) as client:
-        for batch in batches(new):
-            _post(client, url, message(batch))
+        for batch in batches(new, settings.hub_url):
+            _post(client, url, message(batch, settings.hub_url))
             # Marked only once Discord confirms it saved this message, so a lost one is retried.
             with conn:
                 conn.executemany("INSERT OR IGNORE INTO sent_alerts (key, sent_at) VALUES (?, ?)",

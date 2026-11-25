@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ self.heading() }} · Settings · ASO Hub{% endblock %}
+{% block content %}
+<div class="head"><h1>Settings</h1></div>
+<nav class="tabs" aria-label="Settings">
+  {% for href, label in [("/settings", "Overview"), ("/settings/connections", "Connections"), ("/settings/apps", "Apps"),
+                         ("/settings/alerts", "Alerts"), ("/settings/schedule", "Schedule"), ("/settings/sign-in", "Sign-in")] %}
+  <a href="{{ href }}"{% if path == href or path.startswith(href ~ "/") and href != "/settings" %} aria-current="page"{% endif %}>{{ label }}</a>
+  {% endfor %}
+</nav>
+{% if error %}<p class="banner bad" role="alert">{{ error }}</p>{% endif %}
+{% if saved and not error %}<p class="banner good" role="status">{{ saved }}</p>{% endif %}
+<h2 class="section-title">{% block heading %}{% endblock %}</h2>
+{% block settings %}{% endblock %}
+<script src="{{ asset('forms.js') }}" defer></script>
+{% endblock %}
