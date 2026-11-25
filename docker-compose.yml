@@ -21,8 +21,10 @@ services:
       DISCORD_WEBHOOK_FILE: /secrets/discord-webhook
       # Weekly crash digest webhooks: alerts-<app> per app, and alerts-admin for failures.
       ALERTS_WEBHOOK_DIR: /secrets
-    # The hub has no sign-in of its own, so it only listens on this machine. Put an
-    # authenticating proxy or tunnel in front before opening it any wider.
+      # The hub's own password, used once the file exists (set-secret.sh hub-password).
+      HUB_PASSWORD_FILE: /secrets/hub-password
+    # Listens on this machine only. To open it from elsewhere, save a password (or put a
+    # sign-in service in front) and use HTTPS, then change this line.
     ports:
       - "127.0.0.1:8690:8690"
     volumes:

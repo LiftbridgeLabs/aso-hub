@@ -49,16 +49,27 @@ The weekly crash digest posts only the apps listed under `[crash_digest]`.
 - **Read-only access.** Use an App Store Connect key with the Sales role, a Play
   service account with view permissions and a read-only AsoBeast token. The hub
   never changes a listing.
-- **No sign-in of its own.** The compose file listens on the local machine only.
-  Before opening it to others, put it behind a proxy or tunnel that makes people
-  sign in. Never publish the port straight to the internet.
+- **Local by default.** The compose file listens on this machine only.
+- **Sign-in for anything wider.** Once `ASO_HUB_URL` or the allowed hosts name
+  another address, the hub refuses to show anything without a sign-in: its own
+  password, Cloudflare Access, or a proxy you declare with
+  `ASO_HUB_BEHIND_SIGN_IN=true`.
+- **Optional password.** Save one of at least 12 characters with
+  `set-secret.sh hub-password`; the browser asks for it (any user name). Ten wrong
+  tries lock that address out for five minutes (behind a proxy, everyone shares
+  one address). A password sent over plain HTTP can be read on the network, so
+  use HTTPS from other machines. Don't publish the port straight to the internet.
 - **Known addresses only.** It answers to `localhost`, the host in `ASO_HUB_URL`
   and any listed in `ASO_HUB_ALLOWED_HOSTS`, which stops other web pages from
   reaching it through your browser (DNS rebinding).
 - **Locked-down container.** No root, read-only filesystem, no extra
   capabilities; keys are read from files you mount read-only.
-- Keys sit unencrypted in `secrets/` and the database holds your sales figures:
-  protect the server and its backups as you would those.
+- **Keys on disk.** The hub must read its keys without anyone typing anything,
+  so they are files in `secrets/`. The web pages never show or serve them, but
+  anyone with administrator access to the server can read them. Keep the folder
+  readable by the hub's user only, encrypt backups, and if the server is ever
+  compromised, revoke every key and webhook and make new ones. The database
+  holds your sales figures, so protect it the same way.
 
 Found a security problem? Report it privately under the repository's
 **Security** tab, not in a public issue.
@@ -241,8 +252,8 @@ Environment variables: `ASC_ISSUER_ID`, `ASC_KEY_ID`, `ASC_VENDOR_NUMBER`,
 and `PLAY_BUCKET` (Google Play), `ASOBEAST_URL`, `ASOBEAST_TOKEN_FILE` and
 `ASOBEAST_WEB_URL` (your AsoBeast address, for links), `DISCORD_WEBHOOK_FILE`,
 `ALERTS_WEBHOOK_DIR`, `ASO_HUB_URL` (the hub's own address, for links in
-Discord posts). The hub has no sign-in of its own: keep it on a trusted network
-or behind an authenticating proxy. If you use Cloudflare Access, set
+Discord posts).
+`HUB_PASSWORD_FILE` holds an optional password (see Security). If you use Cloudflare Access, set
 `CF_ACCESS_AUD` and `CF_ACCESS_TEAM_DOMAIN` and the hub also checks Access's
 signed pass (`access.py`).
 

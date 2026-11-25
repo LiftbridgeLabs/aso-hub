@@ -11,11 +11,14 @@ if [[ -n "${ASO_HUB_SECRETS:-}" ]]; then dir="$ASO_HUB_SECRETS"
 elif [[ -d "$server_dir" ]]; then dir="$server_dir"
 else dir="$HOME/.config/aso-hub"; fi
 mkdir -p "$dir" && chmod 700 "$dir"
-read -r -s -p "Paste $name: " value
+IFS= read -r -s -p "Paste $name: " value
 echo
 [[ -n "$value" ]] || { echo "nothing pasted, nothing saved" >&2; exit 1; }
 if [[ "$name" == alerts-* || "$name" == discord-webhook ]] && [[ "$value" != https://discord.com/api/webhooks/* ]]; then
   echo "that isn't a Discord webhook address (it starts https://discord.com/api/webhooks/); nothing saved" >&2; exit 1
+fi
+if [[ "$name" == hub-password && ${#value} -lt 12 ]]; then
+  echo "use at least 12 characters; nothing saved" >&2; exit 1
 fi
 umask 077
 tmp=$(mktemp "$dir/.$name.XXXXXX")

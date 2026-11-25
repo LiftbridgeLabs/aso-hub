@@ -63,6 +63,7 @@ def sales_row(app_id, kind, units, territory="US", device="iPhone"):
 def test_host(monkeypatch):
     # The test client calls the pages as "testserver".
     monkeypatch.setenv("ASO_HUB_ALLOWED_HOSTS", "testserver")
+    monkeypatch.setenv("ASO_HUB_BEHIND_SIGN_IN", "true")
 
 
 @pytest.fixture
