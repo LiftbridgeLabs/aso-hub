@@ -238,3 +238,26 @@ def test_a_stopped_request_is_a_failure_not_a_new_app(conn, client, apple):
     with pytest.raises(asc.AscError, match="Apple stopped") as e:
         asc.pull_app(conn, client, "111")
     assert not isinstance(e.value, asc.NoReportRequest)
+
+
+def test_one_apps_failure_doesnt_stop_the_apps_after_it(conn, cfg, monkeypatch):
+    from aso_hub import collect
+
+    read = []
+
+    def pull_app(conn, client, app_id):
+        if app_id == "111":
+            raise asc.AscError("Apple stopped the analytics reports")
+        read.append(app_id)
+        return 1
+
+    monkeypatch.setattr(asc, "Client", lambda *a, **k: None)
+    monkeypatch.setattr(asc, "pull_sales", lambda *a, **k: 0)
+    monkeypatch.setattr(asc, "pull_app", pull_app)
+    apps = [dataclasses.replace(cfg.apps[0], slug="bad", name="Bad", apple_id="111"),
+            dataclasses.replace(cfg.apps[0], slug="good", name="Good", apple_id="222")]
+    settings = dataclasses.replace(cfg, apps=apps, asc_issuer_id="i", asc_key_id="k", asc_vendor_number="v")
+    monkeypatch.setattr(type(settings), "read_secret", lambda self, path: "key")
+    with pytest.raises(asc.AscError, match=r"Bad \(Apple\): Apple stopped"):
+        collect._pull_asc(settings, conn)
+    assert read == ["222"]

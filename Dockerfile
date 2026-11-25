@@ -1,4 +1,4 @@
-# Pinned to an exact image, like requirements.txt; Dependabot proposes updates. Same base as Kettle.
+# Pinned to an exact image, like requirements.txt; Dependabot proposes updates.
 FROM python:3.13-slim@sha256:8d9d0b8bcf6506481eae4907c18f5e3e7902e629f5f6d684f9e7c32e85e3ddf0
 
 ARG VERSION=dev
@@ -20,7 +20,8 @@ RUN pip install -r requirements.txt
 COPY config.toml ./
 COPY aso_hub ./aso_hub
 
-# The server's ubuntu user (1001:1001) owns /opt/appdata, so the container runs as it.
+# Runs without root. The database folder belongs to that user, so a fresh volume is writable.
+RUN mkdir -p /data && chown 1001:1001 /data
 USER 1001:1001
 VOLUME ["/data"]
 EXPOSE 8690

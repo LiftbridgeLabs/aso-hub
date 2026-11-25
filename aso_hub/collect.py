@@ -22,7 +22,7 @@ def _pull_asc(settings: Settings, conn: sqlite3.Connection) -> str:
                            "(ASC_ISSUER_ID, ASC_KEY_ID, ASC_KEY_PATH, ASC_VENDOR_NUMBER).")
     client = asc.Client(settings.asc_issuer_id, settings.asc_key_id, key)
     days = asc.pull_sales(conn, client, settings.asc_vendor_number)
-    files, waiting = 0, []
+    files, waiting, failed = 0, [], []
     for app in settings.apps:
         if app.store == "app_store":
             try:
@@ -30,6 +30,14 @@ def _pull_asc(settings: Settings, conn: sqlite3.Connection) -> str:
             except asc.NoReportRequest:
                 # A new app: its downloads still come from the sales reports above.
                 waiting.append(app.label)
+            except asc.AscError as e:
+                failed.append(f"{app.label}: {e}")
+            except httpx.HTTPError as e:
+                # Network errors can carry a report file's presigned link; keep only the kind.
+                failed.append(f"{app.label}: couldn't reach Apple ({type(e).__name__})")
+    if failed:
+        # Raised after the loop, so one app's problem doesn't stop the apps after it.
+        raise asc.AscError("; ".join(failed))
     message = f"read {days} sales days and {files} analytics files"
     return message + (f"; no store page reports requested yet: {', '.join(waiting)}" if waiting else "")
 

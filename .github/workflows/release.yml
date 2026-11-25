@@ -1,0 +1,83 @@
+# Publish the image to Docker Hub when a version tag (v1.0.0) is pushed, only after the
+# tests and scans pass. Each CPU type is built and started on its own kind of runner,
+# then the two are joined under one tag.
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/aso-hub
+
+jobs:
+  tests:
+    uses: ./.github/workflows/tests.yml
+
+  security:
+    uses: ./.github/workflows/security.yml
+
+  build:
+    needs: [tests, security]
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          docker build --build-arg VERSION="$version" -t "$IMAGE:$version-${{ matrix.arch }}" .
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Start it and load the page
+        run: |
+          docker run -d --name hub --read-only --tmpfs /tmp -p 127.0.0.1:8690:8690 "$IMAGE:$VERSION-${{ matrix.arch }}"
+          curl --retry 15 --retry-delay 2 --retry-all-errors -fsS http://127.0.0.1:8690/healthz
+          curl -fsS -o /dev/null http://127.0.0.1:8690/ || { docker logs hub; exit 1; }
+      - name: Push
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+          docker push "$IMAGE:$VERSION-${{ matrix.arch }}"
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Join the two builds under the version and latest
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+          docker buildx imagetools create -t "$IMAGE:$version" -t "$IMAGE:latest" \
+            "$IMAGE:$version-amd64" "$IMAGE:$version-arm64"
+
+  alert:
+    needs: [tests, security, build, publish]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tell Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.ALERTS_DISCORD_WEBHOOK }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -n "$DISCORD_WEBHOOK" ] || { echo "::warning::ALERTS_DISCORD_WEBHOOK isn't set"; exit 0; }
+          body=$(python3 -c 'import json, os; print(json.dumps({"content": "aso-hub: the release failed. " + os.environ["RUN_URL"]}))')
+          curl --fail -sS -H "Content-Type: application/json" -d "$body" "$DISCORD_WEBHOOK"

@@ -207,28 +207,40 @@ or behind an authenticating proxy. If you use Cloudflare Access, set
 `CF_ACCESS_AUD` and `CF_ACCESS_TEAM_DOMAIN` and the hub also checks Access's
 signed pass (`access.py`).
 
-## On a server
+## Run it with Docker
 
-`deploy/compose.yaml` is an example for any Docker host, with data and secrets
-folders mounted from the host. `deploy/asohub.timer` and `asohub-crashes.timer`
-(with their `.service` files) are systemd units that run the pull twice a day
-and the crash digest weekly through `docker exec`; copy them to
-`/etc/systemd/system/`, set the times and your user, and enable the timers.
-
-Build the image on the host or anywhere that matches its CPU, then point
-`ASO_HUB_VERSION` in `.env` (next to `deploy/compose.yaml`) at the tag and run
-`docker compose -f deploy/compose.yaml up -d`:
+The image is published to Docker Hub for Intel/AMD and ARM machines. Put these
+in one folder: [`deploy/compose.yaml`](deploy/compose.yaml),
+[`config.toml`](config.toml) (edit it for your apps), and
+[`deploy/.env.example`](deploy/.env.example) saved as `.env`. Then:
 
 ```sh
-tag=$(git rev-parse --short HEAD)
-docker build -t aso-hub:$tag --build-arg VERSION=$tag .
+mkdir -p data secrets && sudo chown 1001:1001 data
+docker compose up -d      # after adding secret files: sudo chown -R 1001:1001 secrets
 ```
+
+Open http://127.0.0.1:8690. Save secrets as files in `secrets/` (readable by user
+1001), for example
+`ASO_HUB_SECRETS=./secrets ./set-secret.sh asobeast-token`.
+
+If AsoBeast runs on the same host, add its Docker network to the service so the
+hub can reach it by name, and set `ASOBEAST_URL` to match.
+
+The pull and the weekly crash digest run on a schedule you set on the host.
+`deploy/asohub.timer` and `asohub-crashes.timer` (with their `.service` files)
+are systemd units that do it through `docker exec`; copy them to
+`/etc/systemd/system/`, set the times and your user, and enable the timers.
+
+To update, change `ASO_HUB_VERSION` in `.env` and run
+`docker compose pull && docker compose up -d`.
 
 ## Checks
 
 - `security.yml`: gitleaks over the full history, pip-audit and OSV-Scanner on
   `requirements.txt`, on every push and weekly.
 - `tests.yml`: ruff and pytest on every push.
+- `release.yml`: a version tag builds, starts and publishes the image, after the
+  tests and scans pass.
 - Dependabot update pull requests (`dependabot.yml`).
 - `requirements.txt` pins every library, indirect ones too, so the image ships
   exactly what was scanned.

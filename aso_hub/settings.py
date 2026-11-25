@@ -49,7 +49,7 @@ class Settings:
     google_key_path: Path | None = None
     play_bucket: str | None = None
     # The folder holding the #alerts webhooks: alerts-<app> per app (alerts-lumen)
-    # and alerts-admin, the Admin-Stuff #alerts where failures go.
+    # and alerts-admin, the channel where failures go.
     alerts_webhook_dir: Path | None = None
 
     def app(self, slug: str) -> App | None:

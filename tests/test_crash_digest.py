@@ -235,3 +235,19 @@ def test_webhook_files_are_named_after_the_app(cfg, tmp_path):
     assert cfg.alerts_webhook_file("Atlas").name == "alerts-atlas"
     assert cfg.alerts_webhook_file("Pocket Notes").name == "alerts-pocket-notes"
 
+
+
+def test_an_unexpected_error_still_reaches_admin_alerts(conn, digest_cfg, monkeypatch):
+    discord = FakeDiscord()
+
+    def boom(*args, **kwargs):
+        raise KeyError("secret-link")
+
+    monkeypatch.setattr(crash_digest, "_apple", boom)
+    ok = crash_digest.run(digest_cfg, conn, today=TODAY, asc_client=FakeAsc({}), play_client=FakePlay([], []),
+                          transport=httpx.MockTransport(discord))
+    assert not ok
+    [(url, text)] = discord.posts
+    assert url == ADMIN_HOOK
+    assert "Lumen: unexpected error (KeyError)" in text and "secret-link" not in text
+    assert db.last_runs(conn)["crash_digest"]["last"]["ok"] == 0

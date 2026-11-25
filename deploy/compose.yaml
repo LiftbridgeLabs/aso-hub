@@ -1,44 +1,36 @@
-# Example compose file for any Docker host. Data in /opt/appdata/aso-hub/data,
-# secrets (Apple and Google keys, AsoBeast token, Discord webhooks) in /opt/appdata/aso-hub/secrets, both owned by uid 1001.
-# No ports are published: put a reverse proxy or tunnel on `proxy_network` that reaches http://aso-hub:8690
-# (or add `ports: ["8690:8690"]` to reach it directly on a trusted network).
+# ASO Hub from the published image. Copy this file, config.toml and .env.example (as .env) into one folder:
+#
+#   mkdir -p data secrets && sudo chown 1001:1001 data
+#   docker compose up -d        then open http://127.0.0.1:8690
+#
+# config.toml holds your apps and rules. secrets/ holds the key, token and webhook files, readable by
+# user 1001. Anything not set up yet is skipped, and the page says what hasn't been read.
 services:
   aso-hub:
-    image: aso-hub:${ASO_HUB_VERSION:?set ASO_HUB_VERSION in .env}
+    image: ${ASO_HUB_IMAGE:?set ASO_HUB_IMAGE in .env}:${ASO_HUB_VERSION:-latest}
     container_name: aso-hub
     restart: unless-stopped
-    # .env holds the non-secret ids (ASC_ISSUER_ID, ASC_KEY_ID, ASC_VENDOR_NUMBER, CF_ACCESS_AUD).
     env_file: .env
     environment:
+      HUB_CONFIG: /config/config.toml
       ASC_KEY_PATH: /secrets/asc-key.p8
-      ASOBEAST_TOKEN_FILE: /secrets/asobeast-token
-      ASOBEAST_URL: http://asobeast-api:4000
-      # The aso-hub webhook in #marketing-visibility: new to-dos post there.
-      DISCORD_WEBHOOK_FILE: /secrets/discord-webhook
-      # The weekly crash digest's webhooks: alerts-<app> (each app's own #alerts) and
-      # alerts-admin (the Admin-Stuff #alerts, where a failed digest is reported).
-      ALERTS_WEBHOOK_DIR: /secrets
-      # The aso-hub service account (a Google Cloud service account), read-only in Play Console.
       GOOGLE_KEY_PATH: /secrets/google-play.json
-      # Play Console's reports bucket (installs, store visitors, sales, earnings). Not a secret.
-      PLAY_BUCKET: pubsite_prod_YOUR_BUCKET_ID
+      ASOBEAST_TOKEN_FILE: /secrets/asobeast-token
+      # New to-dos post to this Discord webhook, if the file exists.
+      DISCORD_WEBHOOK_FILE: /secrets/discord-webhook
+      # Weekly crash digest webhooks: alerts-<app> per app, and alerts-admin for failures.
+      ALERTS_WEBHOOK_DIR: /secrets
+    # The hub has no sign-in of its own, so it only listens on this machine. Put an
+    # authenticating proxy or tunnel in front before opening it any wider.
+    ports:
+      - "127.0.0.1:8690:8690"
     volumes:
-      - /opt/appdata/aso-hub/data:/data
-      - /opt/appdata/aso-hub/secrets:/secrets:ro
+      - ./config.toml:/config/config.toml:ro
+      - ./data:/data
+      - ./secrets:/secrets:ro
     read_only: true
     tmpfs:
       - /tmp
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
-    networks:
-      - proxy_network
-      # AsoBeast's API network, so the hub reads it inside the server instead of over the public internet.
-      - asobeast
-
-networks:
-  proxy_network:
-    external: true
-  asobeast:
-    external: true
-    name: ${ASOBEAST_NETWORK:?set ASOBEAST_NETWORK in .env}

@@ -6,6 +6,7 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -23,3 +24,16 @@ jobs:
       - run: ruff check .
       - run: pytest -q
 
+  alert:
+    needs: test
+    if: failure() && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tell Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.ALERTS_DISCORD_WEBHOOK }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -n "$DISCORD_WEBHOOK" ] || { echo "::warning::ALERTS_DISCORD_WEBHOOK isn't set"; exit 0; }
+          body=$(python3 -c 'import json, os; print(json.dumps({"content": "aso-hub: lint or tests failed. " + os.environ["RUN_URL"]}))')
+          curl --fail -sS -H "Content-Type: application/json" -d "$body" "$DISCORD_WEBHOOK"

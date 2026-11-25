@@ -9,6 +9,7 @@ on:
   schedule:
     - cron: "23 14 * * 1"
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -62,3 +63,17 @@ jobs:
           chmod +x osv-scanner
       - name: Scan
         run: ./osv-scanner scan source --lockfile requirements.txt
+
+  alert:
+    needs: [secrets, pip-audit, osv]
+    if: failure() && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tell Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.ALERTS_DISCORD_WEBHOOK }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -n "$DISCORD_WEBHOOK" ] || { echo "::warning::ALERTS_DISCORD_WEBHOOK isn't set"; exit 0; }
+          body=$(python3 -c 'import json, os; print(json.dumps({"content": "aso-hub: a security scan failed. " + os.environ["RUN_URL"]}))')
+          curl --fail -sS -H "Content-Type: application/json" -d "$body" "$DISCORD_WEBHOOK"

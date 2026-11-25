@@ -1,4 +1,4 @@
-"""Post new to-dos to Discord, through the aso-hub webhook in #marketing-visibility.
+"""Post new to-dos to Discord, through the saved discord-webhook.
 
 Only "To do" items post; "Worth knowing" stays on the pages, and snoozed
 AsoBeast items stay quiet. Each item posts once: when it opens, and again only

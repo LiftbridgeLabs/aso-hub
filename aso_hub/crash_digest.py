@@ -8,13 +8,14 @@ missing message means the job didn't run.
 
 Each app's webhook is a file, alerts-<app> (alerts-lumen), in the hub's
 secrets folder; only apps listed under [crash_digest] in config.toml post. If a
-pull or a post fails, a message goes to alerts-admin (the Admin-Stuff #alerts,
+pull or a post fails, a message goes to alerts-admin (a channel for failures,
 where CI failures go) and the run exits non-zero. Webhook URLs are never
 printed, not even in an error.
 """
 import datetime as dt
 import sqlite3
 import sys
+import traceback
 from collections import defaultdict
 from dataclasses import dataclass, field
 
@@ -224,6 +225,10 @@ def run(settings: Settings, conn: sqlite3.Connection, today: dt.date | None = No
                 print(f"{name}: posted the digest for {week.label}")
             except (DigestError, notify.NotifyError) as e:
                 failures.append(f"{name}: {e}")
+            except Exception as e:  # anything unexpected still reaches alerts-admin and the other apps
+                # Only the kind in the message: error text can carry a presigned link or a webhook.
+                failures.append(f"{name}: unexpected error ({type(e).__name__})")
+                traceback.print_exc()
         summary = f"posted {', '.join(posted) or 'nothing'} for {week.label}"
         if failures:
             _alert_failure(settings, http, week, failures, posted, dry_run)
