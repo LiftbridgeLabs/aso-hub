@@ -5,6 +5,7 @@ __pycache__/
 *.db
 *.db-*
 data/
+secrets/
 # Secrets never live in the repo (keys, tokens, env files with values).
 *.p8
 *.pem

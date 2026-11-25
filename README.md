@@ -10,6 +10,9 @@ digest to Discord.
 
 <img src="assets/icon/aso-hub-icon-180.png" alt="ASO Hub icon" width="90">
 
+**Quick start:** [run it with Docker](#run-it-with-docker) using
+[`docker-compose.yml`](docker-compose.yml).
+
 Shared as-is under the MIT license. Issues are welcome; there is no promise of
 support or a roadmap. It was built for one small team's apps, so expect rough
 edges outside that setup.
@@ -211,10 +214,11 @@ signed pass (`access.py`).
 
 The image is published to Docker Hub as
 [`liftbridgelabs/aso-hub`](https://hub.docker.com/r/liftbridgelabs/aso-hub) for Intel/AMD and ARM machines. Put these
-in one folder: [`deploy/compose.yaml`](deploy/compose.yaml),
+in one folder: [`docker-compose.yml`](docker-compose.yml),
 [`config.toml`](config.toml) (edit it for your apps),
 [`set-secret.sh`](set-secret.sh) (saves a secret without showing it), and
-[`deploy/.env.example`](deploy/.env.example) saved as `.env`. Then:
+[`.env.example`](.env.example) saved as `.env` (or clone the repository, which
+has them all). Then:
 
 ```sh
 mkdir -p data secrets && sudo chown 1001:1001 data

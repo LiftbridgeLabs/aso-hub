@@ -1,4 +1,5 @@
-# ASO Hub from the published image. Copy this file, config.toml and .env.example (as .env) into one folder:
+# ASO Hub from the published image. Put this file, config.toml and
+# .env.example (saved as .env) in one folder, or just clone the repository:
 #
 #   mkdir -p data secrets && sudo chown 1001:1001 data
 #   docker compose up -d        then open http://127.0.0.1:8690
